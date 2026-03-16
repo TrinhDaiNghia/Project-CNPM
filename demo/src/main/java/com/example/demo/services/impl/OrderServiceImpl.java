@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,8 +30,29 @@ public class OrderServiceImpl implements OrderService {
     public Order updateOrderStatus(String id, OrderStatus status) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Order not found: " + id));
+
+        OrderStatus currentStatus = order.getStatus();
+        if (currentStatus == status){
+            return order;
+        }
+
+        if (!isValidTransition(currentStatus, status)) {
+            throw new IllegalStateException("Invalid status transition from " + currentStatus + " to " + status);
+        }
+
+
         order.setStatus(status);
         return orderRepository.save(order);
+    }
+
+    private boolean isValidTransition(OrderStatus from, OrderStatus to){
+        return switch (from){
+            case PENDING -> EnumSet.of(OrderStatus.CONFIRMED, OrderStatus.CANCELLED).contains(to);
+            case CONFIRMED -> EnumSet.of(OrderStatus.SHIPPING, OrderStatus.CANCELLED).contains(to);
+            case SHIPPING -> EnumSet.of(OrderStatus.DELIVERED, OrderStatus.RETURNED).contains(to);
+            case DELIVERED -> EnumSet.of(OrderStatus.COMPLETED, OrderStatus.RETURNED).contains(to);
+            case COMPLETED, CANCELLED, RETURNED -> false;
+        };
     }
 
     @Override

@@ -59,17 +59,28 @@ public class VoucherServiceImpl implements VoucherService {
         Voucher voucher = voucherRepository.findByVoucherCode(code)
                 .orElseThrow(() -> new RuntimeException("Voucher not found: " + code));
         Date now = new Date();
-        if (voucher.getStatus() != VoucherStatus.ACTIVE
-                || now.before(voucher.getValidFrom())
-                || now.after(voucher.getValidTo())) {
+        if (now.after(voucher.getValidTo())){
+            voucher.setStatus(VoucherStatus.EXPIRED);
+            voucherRepository.save(voucher);
+            throw new IllegalStateException("Voucher has expired");
+        }
+
+        if(voucher.getStatus() != VoucherStatus.ACTIVE || now.before(voucher.getValidFrom())){
             throw new IllegalStateException("Voucher is not valid");
         }
+
         if (voucher.getUsedCount() >= voucher.getMaxUsage()) {
             voucher.setStatus(VoucherStatus.USED_UP);
             voucherRepository.save(voucher);
             throw new IllegalStateException("Voucher has reached its usage limit");
         }
-        voucher.setUsedCount(voucher.getUsedCount() + 1);
+
+        int nextUsedCount = voucher.getUsedCount() + 1;
+        voucher.setUsedCount(nextUsedCount);
+        if (nextUsedCount >= voucher.getMaxUsage()){
+            voucher.setStatus(VoucherStatus.USED_UP);
+        }
+
         return voucherRepository.save(voucher);
     }
 }

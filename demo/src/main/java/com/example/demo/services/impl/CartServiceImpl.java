@@ -33,6 +33,10 @@ public class CartServiceImpl implements CartService {
 
     @Override
     public Cart addItem(String customerId, String productId, int quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("Quantity must be greater than zero");
+        }
+
         Cart cart = getOrCreateCart(customerId);
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found: " + productId));
@@ -41,7 +45,11 @@ public class CartServiceImpl implements CartService {
                 .filter(item -> item.getProduct().getId().equals(productId))
                 .findFirst()
                 .ifPresentOrElse(
-                        item -> item.setQuantity(item.getQuantity() + quantity),
+                        item -> {
+                            int newQuantity = item.getQuantity() + quantity;
+                            item.setQuantity(newQuantity);
+                            item.setSubTotal(item.getProduct().getPrice() * newQuantity);
+                        },
                         () -> cart.getItems().add(
                                 CartItem.builder()
                                         .cart(cart)

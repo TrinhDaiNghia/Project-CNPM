@@ -70,7 +70,18 @@ public class ProductServiceImpl implements ProductService {
     public Product updateStock(String id, int quantity) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found: " + id));
-        product.setStockQuantity(product.getStockQuantity() + quantity);
+
+        int nextStock = product.getStockQuantity() + quantity;
+        if (nextStock < 0) {
+            throw new IllegalArgumentException("Stock quantity cannot be negative");
+        }
+
+        product.setStockQuantity(nextStock);
+        if (nextStock == 0 && product.getStatus() == ProductStatus.ACTIVE) {
+            product.setStatus(ProductStatus.OUT_OF_STOCK);
+        } else if (nextStock > 0 && product.getStatus() == ProductStatus.OUT_OF_STOCK) {
+            product.setStatus(ProductStatus.ACTIVE);
+        }
         return productRepository.save(product);
     }
 }

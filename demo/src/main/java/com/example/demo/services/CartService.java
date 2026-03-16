@@ -1,7 +1,6 @@
 package com.example.demo.services;
 
 import com.example.demo.entities.Cart;
-import com.example.demo.entities.CartItem;
 
 public interface CartService {
 
