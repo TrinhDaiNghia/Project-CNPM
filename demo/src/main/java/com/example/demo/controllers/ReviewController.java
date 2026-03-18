@@ -1,5 +1,6 @@
 package com.example.demo.controllers;
 
+import com.example.demo.dtos.request.ReviewRequest;
 import com.example.demo.entities.Review;
 import com.example.demo.services.ReviewService;
 import jakarta.validation.Valid;
@@ -33,13 +34,13 @@ public class ReviewController {
     }
 
     @PostMapping
-    public ResponseEntity<Review> create(@Valid @RequestBody Review review) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(reviewService.createReview(review));
+    public ResponseEntity<Review> create(@Valid @RequestBody ReviewRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(reviewService.createReview(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Review> update(@PathVariable String id, @Valid @RequestBody Review review) {
-        return ResponseEntity.ok(reviewService.updateReview(id, review));
+    public ResponseEntity<Review> update(@PathVariable String id, @Valid @RequestBody ReviewRequest request) {
+        return ResponseEntity.ok(reviewService.updateReview(id, request));
     }
 
     @DeleteMapping("/{id}")
