@@ -2,6 +2,7 @@ package com.example.demo.entities;
 
 import com.example.demo.entities.enums.UserGender;
 import com.example.demo.entities.enums.UserRole;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -32,6 +33,7 @@ public class User {
 
     @NotBlank(message = "Password is required")
     @Column(name = "password", nullable = false)
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
     @NotBlank(message = "Email is required")

@@ -1,5 +1,6 @@
 package com.example.demo.controllers;
 
+import com.example.demo.dtos.request.VoucherRequest;
 import com.example.demo.entities.Voucher;
 import com.example.demo.services.VoucherService;
 import jakarta.validation.Valid;
@@ -37,13 +38,13 @@ public class VoucherController {
     }
 
     @PostMapping
-    public ResponseEntity<Voucher> create(@Valid @RequestBody Voucher voucher) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(voucherService.createVoucher(voucher));
+    public ResponseEntity<Voucher> create(@Valid @RequestBody VoucherRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(voucherService.createVoucher(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Voucher> update(@PathVariable String id, @Valid @RequestBody Voucher voucher) {
-        return ResponseEntity.ok(voucherService.updateVoucher(id, voucher));
+    public ResponseEntity<Voucher> update(@PathVariable String id, @Valid @RequestBody VoucherRequest request) {
+        return ResponseEntity.ok(voucherService.updateVoucher(id, request));
     }
 
     @PostMapping("/apply/{code}")

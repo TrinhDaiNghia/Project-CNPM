@@ -1,5 +1,6 @@
 package com.example.demo.controllers;
 
+import com.example.demo.dtos.request.ProductRequest;
 import com.example.demo.entities.Product;
 import com.example.demo.services.ProductService;
 import jakarta.validation.Valid;
@@ -44,14 +45,14 @@ public class ProductController {
         return ResponseEntity.ok(productService.findByCategoryId(categoryId));
     }
 
-    @PostMapping
-    public ResponseEntity<Product> create(@Valid @RequestBody Product product) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProduct(product));
+    @PostMapping("/create")
+    public ResponseEntity<Product> create(@Valid @RequestBody ProductRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProduct(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Product> update(@PathVariable String id, @Valid @RequestBody Product product) {
-        return ResponseEntity.ok(productService.updateProduct(id, product));
+    public ResponseEntity<Product> update(@PathVariable String id, @Valid @RequestBody ProductRequest request) {
+        return ResponseEntity.ok(productService.updateProduct(id, request));
     }
 
     @DeleteMapping("/{id}")
