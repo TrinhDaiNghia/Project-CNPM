@@ -88,6 +88,7 @@ public class ReviewService {
 
     @Transactional(readOnly = true)
     public Double getAverageRating(String productId) {
-        return reviewRepository.findAverageRatingByProductId(productId);
+        Double avg = reviewRepository.findAverageRatingByProductId(productId);
+        return avg != null ? avg : 0.0;
     }
 }

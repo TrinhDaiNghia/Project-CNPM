@@ -84,7 +84,6 @@ public class UserController {
                 .address(user.getAddress())
                 .gender(user.getGender())
                 .role(user.getRole())
-                .point(null)
                 .createdAt(user.getCreatedAt())
                 .build();
     }
