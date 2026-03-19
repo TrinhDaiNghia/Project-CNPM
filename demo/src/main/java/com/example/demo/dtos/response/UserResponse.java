@@ -18,6 +18,6 @@ public class UserResponse {
     private String address;
     private UserGender gender;
     private UserRole role;
-    private Double point;
     private Date createdAt;
 }
+

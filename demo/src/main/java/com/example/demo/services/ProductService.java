@@ -55,6 +55,9 @@ public class ProductService {
     }
 
     public void deleteProduct(String id) {
+        if (!productRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Product not found: " + id);
+        }
         productRepository.deleteById(id);
     }
 

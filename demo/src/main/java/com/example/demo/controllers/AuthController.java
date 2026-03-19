@@ -5,7 +5,6 @@ import com.example.demo.dtos.request.LoginRequest;
 import com.example.demo.dtos.request.RegisterRequest;
 import com.example.demo.dtos.request.ResetPasswordRequest;
 import com.example.demo.dtos.request.VerifyEmailOtpRequest;
-import com.example.demo.dtos.response.AuthResponse;
 import com.example.demo.dtos.response.OtpResponse;
 import com.example.demo.services.AuthService;
 import jakarta.validation.Valid;

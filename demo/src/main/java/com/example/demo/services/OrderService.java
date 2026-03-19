@@ -1,15 +1,23 @@
 package com.example.demo.services;
 
+import com.example.demo.dtos.request.OrderRequest;
+import com.example.demo.entities.Customer;
 import com.example.demo.entities.Order;
+import com.example.demo.entities.OrderItem;
+import com.example.demo.entities.Product;
+import com.example.demo.entities.Voucher;
 import com.example.demo.entities.enums.OrderStatus;
 import com.example.demo.exceptions.ResourceNotFoundException;
+import com.example.demo.repositories.CustomerRepository;
 import com.example.demo.repositories.OrderRepository;
+import com.example.demo.repositories.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,13 +27,49 @@ import java.util.Optional;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final CustomerRepository customerRepository;
+    private final ProductRepository productRepository;
+    private final VoucherService voucherService;
     private final AccessControlService accessControlService;
 
-    public Order createOrder(Order order) {
-        if (order.getCustomer() == null || order.getCustomer().getId() == null) {
-            throw new IllegalArgumentException("Customer is required to create an order");
+    public Order createOrder(OrderRequest request) {
+        accessControlService.requireCustomerAccess(request.getCustomerId());
+
+        Customer customer = customerRepository.findById(request.getCustomerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + request.getCustomerId()));
+
+        Order order = Order.builder()
+                .customer(customer)
+                .note(request.getNote())
+                .build();
+
+        // Build order items
+        List<OrderItem> orderItems = new ArrayList<>();
+        long totalAmount = 0;
+        for (OrderRequest.OrderItemRequest itemReq : request.getItems()) {
+            Product product = productRepository.findById(itemReq.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + itemReq.getProductId()));
+            long subTotal = product.getPrice() * itemReq.getQuantity();
+            OrderItem orderItem = OrderItem.builder()
+                    .order(order)
+                    .product(product)
+                    .quantity(itemReq.getQuantity())
+                    .subTotal(subTotal)
+                    .build();
+            orderItems.add(orderItem);
+            totalAmount += subTotal;
         }
-        accessControlService.requireCustomerAccess(order.getCustomer().getId());
+        order.setOrderItems(orderItems);
+
+        // Apply voucher if provided
+        if (request.getVoucherCode() != null && !request.getVoucherCode().isBlank()) {
+            Voucher voucher = voucherService.consumeVoucher(request.getVoucherCode());
+            order.setVoucher(voucher);
+            long discount = totalAmount * voucher.getDiscountPercent() / 100;
+            totalAmount -= discount;
+        }
+
+        order.setTotalAmount(Math.max(totalAmount, 0L));
         return orderRepository.save(order);
     }
 
@@ -80,6 +124,7 @@ public class OrderService {
         orderRepository.save(order);
     }
 }
+
 
 
 
