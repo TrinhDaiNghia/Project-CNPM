@@ -12,4 +12,6 @@ public interface ImportReceiptRepository extends JpaRepository<ImportReceipt, St
     List<ImportReceipt> findBySupplierId(String supplierId);
 
     List<ImportReceipt> findByOwnerId(String ownerId);
+
+    List<ImportReceipt> findByOwnerIdAndSupplierId(String ownerId, String supplierId);
 }
