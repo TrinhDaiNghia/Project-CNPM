@@ -97,10 +97,14 @@ public class ProductService {
         product.setPrice(request.getPrice());
         product.setStockQuantity(request.getStockQuantity());
         product.setCategory(category);
-        product.setPartNumber(request.getPartNumber());
-        product.setPowerSource(request.getPowerSource());
-        product.setLicense(request.getLicense());
-        product.setWarranty(request.getWarranty());
+        product.setMovementType(request.getMovementType());
+        product.setGlassMaterial(request.getGlassMaterial());
+        product.setWaterResistance(request.getWaterResistance());
+        product.setFaceSize(request.getFaceSize());
+        product.setWireMaterial(request.getWireMaterial());
+        product.setWireColor(request.getWireColor());
+        product.setCaseColor(request.getCaseColor());
+        product.setFaceColor(request.getFaceColor());
 
         if (product.getStatus() == null) {
             product.setStatus(ProductStatus.ACTIVE);

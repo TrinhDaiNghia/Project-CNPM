@@ -1,5 +1,6 @@
 package com.example.demo.dtos.request;
 
+import com.example.demo.entities.enums.VoucherStatus;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
@@ -10,13 +11,12 @@ public class VoucherRequest {
 
     @NotBlank(message = "Voucher code is required")
     @Size(min = 4, max = 50)
-    private String voucherCode;
+    private String code;
 
     @Min(0) @Max(100)
     private Integer discountPercent = 0;
 
-    @Min(0)
-    private Long minOrderAmount = 0L;
+    private Boolean isUsed = false;
 
     @NotNull(message = "Valid from date is required")
     private Date validFrom;
@@ -25,5 +25,9 @@ public class VoucherRequest {
     private Date validTo;
 
     @Min(1)
-    private Integer maxUsage = 1;
+    private Integer quantity = 1;
+
+    private Date usedAt;
+
+    private VoucherStatus status;
 }

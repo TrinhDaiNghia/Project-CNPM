@@ -26,8 +26,8 @@ public class Voucher {
 
     @NotBlank(message = "Voucher code is required")
     @Size(min = 4, max = 50, message = "Voucher code must be between 4 and 50 characters")
-    @Column(name = "voucher_code", nullable = false, unique = true, length = 50)
-    private String voucherCode;
+    @Column(name = "code", nullable = false, unique = true, length = 50)
+    private String code;
 
     @Min(value = 0, message = "Discount percent must not be negative")
     @Max(value = 100, message = "Discount percent must not exceed 100")
@@ -35,10 +35,9 @@ public class Voucher {
     @Builder.Default
     private Integer discountPercent = 0;
 
-    @Min(value = 0, message = "Min order amount must not be negative")
-    @Column(name = "min_order_amount")
+    @Column(name = "is_used", nullable = false)
     @Builder.Default
-    private Long minOrderAmount = 0L;
+    private Boolean isUsed = false;
 
     @NotNull(message = "Valid from date is required")
     @Temporal(TemporalType.TIMESTAMP)
@@ -50,15 +49,14 @@ public class Voucher {
     @Column(name = "valid_to", nullable = false)
     private Date validTo;
 
-    @Min(value = 1, message = "Max usage must be at least 1")
-    @Column(name = "max_usage", nullable = false)
-    @Builder.Default
-    private Integer maxUsage = 1;
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "used_at")
+    private Date usedAt;
 
-    @Min(value = 0, message = "Used count must not be negative")
-    @Column(name = "used_count", columnDefinition = "INT DEFAULT 0")
+    @Min(value = 1, message = "Quantity must be at least 1")
+    @Column(name = "quantity", nullable = false)
     @Builder.Default
-    private Integer usedCount = 0;
+    private Integer quantity = 1;
 
     @NotNull(message = "Voucher status is required")
     @Enumerated(EnumType.STRING)

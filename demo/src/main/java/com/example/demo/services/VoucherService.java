@@ -41,7 +41,7 @@ public class VoucherService {
     }
     @Transactional(readOnly = true)
     public Optional<Voucher> findByCode(String code) {
-        return voucherRepository.findByVoucherCode(code);
+        return voucherRepository.findByCode(code);
     }
     @Transactional(readOnly = true)
     public List<Voucher> findActiveVouchers() {
@@ -54,15 +54,18 @@ public class VoucherService {
 
     public Voucher consumeVoucher(String code) {
         Voucher voucher = validateVoucher(code);
-        voucher.setUsedCount(voucher.getUsedCount() + 1);
-        if (voucher.getUsedCount() >= voucher.getMaxUsage()) {
+        voucher.setQuantity(voucher.getQuantity() - 1);
+        voucher.setUsedAt(new Date());
+        if (voucher.getQuantity() <= 0) {
+            voucher.setQuantity(0);
+            voucher.setIsUsed(true);
             voucher.setStatus(VoucherStatus.USED_UP);
         }
         return voucherRepository.save(voucher);
     }
 
     private Voucher validateVoucher(String code) {
-        Voucher voucher = voucherRepository.findByVoucherCode(code)
+        Voucher voucher = voucherRepository.findByCode(code)
                 .orElseThrow(() -> new ResourceNotFoundException("Voucher not found: " + code));
         Date now = new Date();
         if (voucher.getStatus() != VoucherStatus.ACTIVE
@@ -70,28 +73,30 @@ public class VoucherService {
                 || now.after(voucher.getValidTo())) {
             throw new IllegalStateException("Voucher is not valid");
         }
-        if (voucher.getUsedCount() >= voucher.getMaxUsage()) {
-            if (voucher.getStatus() != VoucherStatus.USED_UP) {
-                voucher.setStatus(VoucherStatus.USED_UP);
-                voucherRepository.save(voucher);
-            }
+        if (Boolean.TRUE.equals(voucher.getIsUsed()) || voucher.getQuantity() <= 0) {
+            voucher.setIsUsed(true);
+            voucher.setQuantity(0);
+            voucher.setStatus(VoucherStatus.USED_UP);
+            voucherRepository.save(voucher);
             throw new IllegalStateException("Voucher has reached its usage limit");
         }
         return voucher;
     }
 
     private void applyVoucherRequest(Voucher voucher, VoucherRequest request) {
-        voucher.setVoucherCode(request.getVoucherCode());
+        voucher.setCode(request.getCode());
         voucher.setDiscountPercent(request.getDiscountPercent());
-        voucher.setMinOrderAmount(request.getMinOrderAmount());
+        voucher.setIsUsed(request.getIsUsed());
         voucher.setValidFrom(request.getValidFrom());
         voucher.setValidTo(request.getValidTo());
-        voucher.setMaxUsage(request.getMaxUsage());
-        if (voucher.getStatus() == null) {
-            voucher.setStatus(VoucherStatus.ACTIVE);
+        voucher.setUsedAt(request.getUsedAt());
+        voucher.setQuantity(request.getQuantity());
+        voucher.setStatus(request.getStatus() == null ? VoucherStatus.ACTIVE : request.getStatus());
+        if (voucher.getIsUsed() == null) {
+            voucher.setIsUsed(false);
         }
-        if (voucher.getUsedCount() == null) {
-            voucher.setUsedCount(0);
+        if (voucher.getQuantity() == null || voucher.getQuantity() < 1) {
+            voucher.setQuantity(1);
         }
     }
 }
