@@ -13,8 +13,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -59,6 +62,27 @@ public class ProductService {
             throw new ResourceNotFoundException("Product not found: " + id);
         }
         productRepository.deleteById(id);
+    }
+
+    public List<Product> compareProducts(String productAId, String productBId) {
+        if (productAId == null || productAId.isBlank() || productBId == null || productBId.isBlank()) {
+            throw new IllegalArgumentException("Both product IDs are required");
+        }
+
+        if (productAId.equals(productBId)) {
+            throw new IllegalArgumentException("Cannot compare the same product: " + productAId);
+        }
+
+        Map<String, Product> productsById = productRepository.findAllById(List.of(productAId, productBId))
+                .stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity(), (left, right) -> left));
+
+        Product productA = Optional.ofNullable(productsById.get(productAId))
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productAId));
+        Product productB = Optional.ofNullable(productsById.get(productBId))
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productBId));
+
+        return List.of(productA, productB);
     }
 
     @Transactional(readOnly = true)
