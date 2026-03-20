@@ -1,0 +1,51 @@
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and crash dumps
+*.log
+hs_err_pid*.log
+replay_pid*.log
+
+# Environment and local secrets
+.env
+.env.*
+*.local
+**/application.properties
+!**/application-example.properties
+!**/application.properties.example
+
+# Java / Maven / Gradle build output
+**/target/
+**/build/
+**/out/
+.gradle/
+
+# IDE and editor metadata
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+.apt_generated/
+.springBeans
+.sts4-cache/
+
+# NetBeans
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
