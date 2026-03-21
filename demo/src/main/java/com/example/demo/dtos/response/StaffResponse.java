@@ -9,7 +9,7 @@ import java.util.Date;
 
 @Data
 @Builder
-public class UserResponse {
+public class StaffResponse {
 
     private String id;
     private String username;
@@ -19,6 +19,8 @@ public class UserResponse {
     private String address;
     private UserGender gender;
     private UserRole role;
-    private Double point;
+    private String staffId;
+    private Date joinDate;
     private Date createdAt;
 }
+

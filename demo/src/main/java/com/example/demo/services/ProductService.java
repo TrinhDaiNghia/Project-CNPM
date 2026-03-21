@@ -93,18 +93,18 @@ public class ProductService {
     private void applyProductRequest(Product product, ProductRequest request, Category category) {
         product.setBrand(request.getBrand());
         product.setName(request.getName());
-        product.setDescription(request.getDescription());
+        product.setDescription(request.getDescription() != null ? request.getDescription() : request.getSpecs());
         product.setPrice(request.getPrice());
         product.setStockQuantity(request.getStockQuantity());
         product.setCategory(category);
         product.setMovementType(request.getMovementType());
         product.setGlassMaterial(request.getGlassMaterial());
         product.setWaterResistance(request.getWaterResistance());
-        product.setFaceSize(request.getFaceSize());
+        product.setFaceSize(request.getFaceSize() != null ? request.getFaceSize() : request.getSize());
         product.setWireMaterial(request.getWireMaterial());
-        product.setWireColor(request.getWireColor());
-        product.setCaseColor(request.getCaseColor());
-        product.setFaceColor(request.getFaceColor());
+        product.setWireColor(request.getWireColor() != null ? request.getWireColor() : request.getColor());
+        product.setCaseColor(request.getCaseColor() != null ? request.getCaseColor() : request.getColor());
+        product.setFaceColor(request.getFaceColor() != null ? request.getFaceColor() : request.getColor());
 
         if (product.getStatus() == null) {
             product.setStatus(ProductStatus.ACTIVE);

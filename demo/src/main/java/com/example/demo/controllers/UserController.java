@@ -67,6 +67,7 @@ public class UserController {
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPassword(request.getPassword());
+        user.setFullName(request.getFullName());
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
         user.setAddress(request.getAddress());
@@ -79,6 +80,7 @@ public class UserController {
         return UserResponse.builder()
                 .id(user.getId())
                 .username(user.getUsername())
+                .fullName(user.getFullName())
                 .email(user.getEmail())
                 .phone(user.getPhone())
                 .address(user.getAddress())

@@ -30,4 +30,12 @@ public class VoucherRequest {
     private Date usedAt;
 
     private VoucherStatus status;
+
+    @AssertTrue(message = "Valid to date must be after valid from date")
+    public boolean isValidDateRange() {
+        if (validFrom == null || validTo == null) {
+            return true;
+        }
+        return validTo.after(validFrom);
+    }
 }

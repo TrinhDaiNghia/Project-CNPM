@@ -50,4 +50,13 @@ public class ProductRequest {
 
     @Size(max = 100)
     private String faceColor;
+
+    @Size(max = 100)
+    private String color;
+
+    @Size(max = 100)
+    private String size;
+
+    @Size(max = 1000)
+    private String specs;
 }
