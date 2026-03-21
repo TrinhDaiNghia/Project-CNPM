@@ -1,22 +1,26 @@
 package com.example.demo.dtos.request;
 
 import com.example.demo.entities.enums.VoucherStatus;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.util.Date;
 
 @Data
-public class VoucherRequest {
+public class VoucherCreateRequest {
 
     @NotBlank(message = "Voucher code is required")
     @Size(min = 4, max = 50)
     private String code;
 
-    @Min(0) @Max(100)
+    @Min(0)
+    @Max(100)
     private Integer discountPercent = 0;
-
-    private Boolean isUsed = false;
 
     @NotNull(message = "Valid from date is required")
     private Date validFrom;
@@ -26,8 +30,6 @@ public class VoucherRequest {
 
     @Min(1)
     private Integer quantity = 1;
-
-    private Date usedAt;
 
     private VoucherStatus status;
 
@@ -39,3 +41,4 @@ public class VoucherRequest {
         return validTo.after(validFrom);
     }
 }
+

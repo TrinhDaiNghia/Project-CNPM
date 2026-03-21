@@ -1,6 +1,7 @@
 package com.example.demo.services;
 
-import com.example.demo.dtos.request.VoucherRequest;
+import com.example.demo.dtos.request.VoucherCreateRequest;
+import com.example.demo.dtos.request.VoucherUpdateRequest;
 import com.example.demo.entities.Voucher;
 import com.example.demo.entities.enums.VoucherStatus;
 import com.example.demo.exceptions.ResourceNotFoundException;
@@ -19,13 +20,13 @@ import java.util.Optional;
 public class VoucherService {
 
     private final VoucherRepository voucherRepository;
-    public Voucher createVoucher(VoucherRequest request) {
+    public Voucher createVoucher(VoucherCreateRequest request) {
         Voucher voucher = new Voucher();
         applyVoucherRequest(voucher, request);
         return voucherRepository.save(voucher);
     }
 
-    public Voucher updateVoucher(String id, VoucherRequest request) {
+    public Voucher updateVoucher(String id, VoucherUpdateRequest request) {
         Voucher existing = voucherRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Voucher not found: " + id));
         applyVoucherRequest(existing, request);
@@ -83,15 +84,29 @@ public class VoucherService {
         return voucher;
     }
 
-    private void applyVoucherRequest(Voucher voucher, VoucherRequest request) {
-        voucher.setCode(request.getCode());
-        voucher.setDiscountPercent(request.getDiscountPercent());
-        voucher.setIsUsed(request.getIsUsed());
-        voucher.setValidFrom(request.getValidFrom());
-        voucher.setValidTo(request.getValidTo());
-        voucher.setUsedAt(request.getUsedAt());
-        voucher.setQuantity(request.getQuantity());
-        voucher.setStatus(request.getStatus() == null ? VoucherStatus.ACTIVE : request.getStatus());
+    private void applyVoucherRequest(Voucher voucher, VoucherCreateRequest request) {
+        applyVoucherFields(voucher, request.getCode(), request.getDiscountPercent(), request.getValidFrom(), request.getValidTo(),
+                request.getQuantity(), request.getStatus());
+    }
+
+    private void applyVoucherRequest(Voucher voucher, VoucherUpdateRequest request) {
+        applyVoucherFields(voucher, request.getCode(), request.getDiscountPercent(), request.getValidFrom(), request.getValidTo(),
+                request.getQuantity(), request.getStatus());
+    }
+
+    private void applyVoucherFields(Voucher voucher,
+                                    String code,
+                                    Integer discountPercent,
+                                    Date validFrom,
+                                    Date validTo,
+                                    Integer quantity,
+                                    VoucherStatus status) {
+        voucher.setCode(code);
+        voucher.setDiscountPercent(discountPercent);
+        voucher.setValidFrom(validFrom);
+        voucher.setValidTo(validTo);
+        voucher.setQuantity(quantity);
+        voucher.setStatus(status == null ? VoucherStatus.ACTIVE : status);
         if (voucher.getIsUsed() == null) {
             voucher.setIsUsed(false);
         }

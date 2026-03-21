@@ -1,0 +1,33 @@
+package com.example.demo.dtos.request;
+
+import com.example.demo.entities.enums.UserGender;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
+
+@Data
+public class StaffUpdateRequest {
+
+    @NotBlank(message = "Full name is required")
+    @Size(max = 80)
+    private String fullName;
+
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
+    private String email;
+
+    @Pattern(regexp = "^(\\+84|0)[3-9]\\d{8}$", message = "Invalid Vietnamese phone number")
+    private String phone;
+
+    @Size(max = 255)
+    private String address;
+
+    private UserGender gender;
+
+    @NotBlank(message = "Staff code is required")
+    @Size(max = 30)
+    private String staffId;
+}
+

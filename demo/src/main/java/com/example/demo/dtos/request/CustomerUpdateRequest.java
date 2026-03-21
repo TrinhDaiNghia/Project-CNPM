@@ -1,7 +1,6 @@
 package com.example.demo.dtos.request;
 
 import com.example.demo.entities.enums.UserGender;
-import com.example.demo.entities.enums.UserRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -9,14 +8,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
-public class CustomerRequest {
-
-    @NotBlank(message = "Username is required")
-    @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
-    private String username;
-
-    @Size(min = 8, max = 100, message = "Password must be between 8 and 100 characters")
-    private String password;
+public class CustomerUpdateRequest {
 
     @NotBlank(message = "Full name is required")
     @Size(max = 80)
@@ -34,7 +26,5 @@ public class CustomerRequest {
     private String address;
 
     private UserGender gender;
-
-    private UserRole role = UserRole.CUSTOMER;
 }
 

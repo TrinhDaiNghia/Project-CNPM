@@ -96,9 +96,8 @@ public class AuthService {
                 .build();
 
         User savedUser = userRepository.save(Objects.requireNonNull(user));
-        Customer customer = Customer.builder()
-                .user(savedUser)
-                .build();
+        Customer customer = new Customer();
+        customer.setId(savedUser.getId());
         customerRepository.save(Objects.requireNonNull(customer));
         pendingRegistrations.remove(emailKey);
 

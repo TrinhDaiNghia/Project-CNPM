@@ -1,6 +1,7 @@
 package com.example.demo.controllers;
 
-import com.example.demo.dtos.request.UserRequest;
+import com.example.demo.dtos.request.UserCreateRequest;
+import com.example.demo.dtos.request.UserUpdateRequest;
 import com.example.demo.dtos.response.UserResponse;
 import com.example.demo.entities.User;
 import com.example.demo.entities.enums.UserRole;
@@ -46,13 +47,13 @@ public class UserController {
     }
 
     @PostMapping
-    public ResponseEntity<UserResponse> create(@Valid @RequestBody UserRequest request) {
+    public ResponseEntity<UserResponse> create(@Valid @RequestBody UserCreateRequest request) {
         User created = userService.createUser(toUserEntity(request));
         return ResponseEntity.status(HttpStatus.CREATED).body(toUserResponse(created));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<UserResponse> update(@PathVariable String id, @Valid @RequestBody UserRequest request) {
+    public ResponseEntity<UserResponse> update(@PathVariable String id, @Valid @RequestBody UserUpdateRequest request) {
         User updated = userService.updateUser(id, toUserEntity(request));
         return ResponseEntity.ok(toUserResponse(updated));
     }
@@ -63,10 +64,22 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    private User toUserEntity(UserRequest request) {
+    private User toUserEntity(UserCreateRequest request) {
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPassword(request.getPassword());
+        user.setFullName(request.getFullName());
+        user.setEmail(request.getEmail());
+        user.setPhone(request.getPhone());
+        user.setAddress(request.getAddress());
+        user.setGender(request.getGender());
+        user.setRole(request.getRole());
+        return user;
+    }
+
+    private User toUserEntity(UserUpdateRequest request) {
+        User user = new User();
+        user.setUsername(request.getUsername());
         user.setFullName(request.getFullName());
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());

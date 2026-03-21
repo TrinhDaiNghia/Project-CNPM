@@ -1,6 +1,7 @@
 package com.example.demo.services;
 
-import com.example.demo.dtos.request.ProductRequest;
+import com.example.demo.dtos.request.ProductCreateRequest;
+import com.example.demo.dtos.request.ProductUpdateRequest;
 import com.example.demo.entities.Category;
 import com.example.demo.entities.Product;
 import com.example.demo.entities.enums.ProductStatus;
@@ -24,7 +25,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
 
-    public Product createProduct(ProductRequest request) {
+    public Product createProduct(ProductCreateRequest request) {
         if (productRepository.existsByNameAndCategoryId(request.getName(), request.getCategoryId())) {
             throw new IllegalStateException("Product already exists in this category");
         }
@@ -37,7 +38,7 @@ public class ProductService {
         return productRepository.save(product);
     }
 
-    public Product updateProduct(String id, ProductRequest request) {
+    public Product updateProduct(String id, ProductUpdateRequest request) {
         Product existing = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
 
@@ -90,21 +91,52 @@ public class ProductService {
         return productRepository.save(product);
     }
 
-    private void applyProductRequest(Product product, ProductRequest request, Category category) {
-        product.setBrand(request.getBrand());
-        product.setName(request.getName());
-        product.setDescription(request.getDescription() != null ? request.getDescription() : request.getSpecs());
-        product.setPrice(request.getPrice());
-        product.setStockQuantity(request.getStockQuantity());
+    private void applyProductRequest(Product product, ProductCreateRequest request, Category category) {
+        applyProductFields(product, request.getBrand(), request.getName(), request.getDescription(), request.getPrice(),
+                request.getStockQuantity(), request.getMovementType(), request.getGlassMaterial(), request.getWaterResistance(),
+                request.getFaceSize(), request.getSize(), request.getWireMaterial(), request.getWireColor(), request.getCaseColor(),
+                request.getFaceColor(), request.getColor(), request.getSpecs(), category);
+    }
+
+    private void applyProductRequest(Product product, ProductUpdateRequest request, Category category) {
+        applyProductFields(product, request.getBrand(), request.getName(), request.getDescription(), request.getPrice(),
+                request.getStockQuantity(), request.getMovementType(), request.getGlassMaterial(), request.getWaterResistance(),
+                request.getFaceSize(), request.getSize(), request.getWireMaterial(), request.getWireColor(), request.getCaseColor(),
+                request.getFaceColor(), request.getColor(), request.getSpecs(), category);
+    }
+
+    private void applyProductFields(Product product,
+                                    String brand,
+                                    String name,
+                                    String description,
+                                    Long price,
+                                    Integer stockQuantity,
+                                    String movementType,
+                                    String glassMaterial,
+                                    String waterResistance,
+                                    String faceSize,
+                                    String size,
+                                    String wireMaterial,
+                                    String wireColor,
+                                    String caseColor,
+                                    String faceColor,
+                                    String color,
+                                    String specs,
+                                    Category category) {
+        product.setBrand(brand);
+        product.setName(name);
+        product.setDescription(description != null ? description : specs);
+        product.setPrice(price);
+        product.setStockQuantity(stockQuantity);
         product.setCategory(category);
-        product.setMovementType(request.getMovementType());
-        product.setGlassMaterial(request.getGlassMaterial());
-        product.setWaterResistance(request.getWaterResistance());
-        product.setFaceSize(request.getFaceSize() != null ? request.getFaceSize() : request.getSize());
-        product.setWireMaterial(request.getWireMaterial());
-        product.setWireColor(request.getWireColor() != null ? request.getWireColor() : request.getColor());
-        product.setCaseColor(request.getCaseColor() != null ? request.getCaseColor() : request.getColor());
-        product.setFaceColor(request.getFaceColor() != null ? request.getFaceColor() : request.getColor());
+        product.setMovementType(movementType);
+        product.setGlassMaterial(glassMaterial);
+        product.setWaterResistance(waterResistance);
+        product.setFaceSize(faceSize != null ? faceSize : size);
+        product.setWireMaterial(wireMaterial);
+        product.setWireColor(wireColor != null ? wireColor : color);
+        product.setCaseColor(caseColor != null ? caseColor : color);
+        product.setFaceColor(faceColor != null ? faceColor : color);
 
         if (product.getStatus() == null) {
             product.setStatus(ProductStatus.ACTIVE);
