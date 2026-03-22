@@ -71,7 +71,6 @@ public class ImportReceiptService {
             receipt.getImportDetails().add(detail);
 
             product.setStockQuantity(product.getStockQuantity() + itemRequest.getQuantity());
-            product.setUnitCost(itemRequest.getImportPrice());
             productRepository.save(product);
         }
 

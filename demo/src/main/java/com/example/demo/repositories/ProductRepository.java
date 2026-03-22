@@ -20,7 +20,7 @@ public interface ProductRepository extends JpaRepository<Product, String> {
 
     Page<Product> findByNameContainingIgnoreCase(String name, Pageable pageable);
 
-    @Query("SELECT p FROM Product p WHERE p.stockQuantity > 0 AND p.status = 'ACTIVE'")
+    @Query("SELECT p FROM Product p JOIN FETCH p.category WHERE p.stockQuantity > 0 AND p.status = 'ACTIVE'")
     List<Product> findAvailableProducts();
 
     @Query("SELECT p FROM Product p WHERE p.brand = :brand AND p.status = :status")

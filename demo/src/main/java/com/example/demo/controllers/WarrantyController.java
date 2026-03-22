@@ -32,7 +32,7 @@ public class WarrantyController {
         return ResponseEntity.ok(warrantyService.findById(id));
     }
 
-    @PostMapping
+    @PostMapping("/create")
     public ResponseEntity<WarrantyResponse> create(@Valid @RequestBody WarrantyRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(warrantyService.createWarranty(request));
     }

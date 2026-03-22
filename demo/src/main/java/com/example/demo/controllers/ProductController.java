@@ -1,7 +1,7 @@
 package com.example.demo.controllers;
 
 import com.example.demo.dtos.request.ProductRequest;
-import com.example.demo.entities.Product;
+import com.example.demo.dtos.response.ProductResponse;
 import com.example.demo.services.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,38 +20,39 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService productService;
+    
 
     @GetMapping
-    public ResponseEntity<List<Product>> getAllAvailable() {
+    public ResponseEntity<List<ProductResponse>> getAllAvailable() {
         return ResponseEntity.ok(productService.findAvailableProducts());
     }
 
     @GetMapping("/search")
-    public ResponseEntity<Page<Product>> search(
+    public ResponseEntity<Page<ProductResponse>> search(
             @RequestParam String name,
             @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(productService.searchByName(name, pageable));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Product> getById(@PathVariable String id) {
+    public ResponseEntity<ProductResponse> getById(@PathVariable String id) {
         return productService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/category/{categoryId}")
-    public ResponseEntity<List<Product>> getByCategory(@PathVariable String categoryId) {
+    public ResponseEntity<List<ProductResponse>> getByCategory(@PathVariable String categoryId) {
         return ResponseEntity.ok(productService.findByCategoryId(categoryId));
     }
 
     @PostMapping("/create")
-    public ResponseEntity<Product> create(@Valid @RequestBody ProductRequest request) {
+    public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProduct(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Product> update(@PathVariable String id, @Valid @RequestBody ProductRequest request) {
+    public ResponseEntity<ProductResponse> update(@PathVariable String id, @Valid @RequestBody ProductRequest request) {
         return ResponseEntity.ok(productService.updateProduct(id, request));
     }
 
@@ -62,7 +63,7 @@ public class ProductController {
     }
 
     @GetMapping("/compare")
-    public ResponseEntity<List<Product>> compare(@RequestParam String productAId, @RequestParam String productBId) {
+    public ResponseEntity<List<ProductResponse>> compare(@RequestParam String productAId, @RequestParam String productBId) {
         return ResponseEntity.ok(productService.compareProducts(productAId, productBId));
     }
 }
