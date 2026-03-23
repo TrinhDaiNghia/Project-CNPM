@@ -12,6 +12,7 @@ public class SupplierSearchRequest {
     @Size(max = 100)
     private String name;
 
+
     @Size(max = 500)
     private String contractInfo;
 

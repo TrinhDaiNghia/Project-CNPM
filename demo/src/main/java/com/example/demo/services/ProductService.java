@@ -1,6 +1,7 @@
 package com.example.demo.services;
 
 import com.example.demo.dtos.request.ProductCreateRequest;
+import com.example.demo.dtos.request.ProductSearchRequest;
 import com.example.demo.dtos.request.ProductUpdateRequest;
 import com.example.demo.entities.Category;
 import com.example.demo.entities.Product;
@@ -26,6 +27,8 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
 
     public Product createProduct(ProductCreateRequest request) {
+        validateProductRequest(request.getPrice(), request.getStockQuantity(), request.getName(), request.getBrand());
+
         if (productRepository.existsByNameAndCategoryId(request.getName(), request.getCategoryId())) {
             throw new IllegalStateException("Product already exists in this category");
         }
@@ -39,6 +42,8 @@ public class ProductService {
     }
 
     public Product updateProduct(String id, ProductUpdateRequest request) {
+        validateProductRequest(request.getPrice(), request.getStockQuantity(), request.getName(), request.getBrand());
+
         Product existing = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
 
@@ -56,7 +61,14 @@ public class ProductService {
     }
 
     public void deleteProduct(String id) {
-        productRepository.deleteById(id);
+        Product existing = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
+
+        if (productRepository.existsRelatedTransactions(id)) {
+            throw new IllegalStateException("Cannot delete product because it is referenced in order transactions");
+        }
+
+        productRepository.delete(existing);
     }
 
     @Transactional(readOnly = true)
@@ -75,6 +87,18 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
+    public Page<Product> searchProducts(ProductSearchRequest request, Pageable pageable) {
+        return productRepository.searchProducts(
+                normalizeSearchText(request.getName()),
+                normalizeSearchText(request.getBrand()),
+                normalizeSearchText(request.getColor()),
+                normalizeSearchText(request.getSize()),
+                normalizeSearchText(request.getSpec()),
+                request.getStatus(),
+                pageable);
+    }
+
+    @Transactional(readOnly = true)
     public List<Product> findAvailableProducts() {
         return productRepository.findAvailableProducts();
     }
@@ -87,8 +111,34 @@ public class ProductService {
     public Product updateStock(String id, int quantity) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
-        product.setStockQuantity(product.getStockQuantity() + quantity);
+        int nextQuantity = product.getStockQuantity() + quantity;
+        if (nextQuantity < 0) {
+            throw new IllegalArgumentException("Stock quantity cannot be negative");
+        }
+        product.setStockQuantity(nextQuantity);
         return productRepository.save(product);
+    }
+
+    private void validateProductRequest(Long price, Integer stockQuantity, String name, String brand) {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("Product name is required");
+        }
+        if (brand == null || brand.isBlank()) {
+            throw new IllegalArgumentException("Brand is required");
+        }
+        if (price == null || price <= 0) {
+            throw new IllegalArgumentException("Price must be greater than 0");
+        }
+        if (stockQuantity == null || stockQuantity < 0) {
+            throw new IllegalArgumentException("Stock quantity must not be negative");
+        }
+    }
+
+    private String normalizeSearchText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private void applyProductRequest(Product product, ProductCreateRequest request, Category category) {
