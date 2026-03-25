@@ -7,10 +7,8 @@ import com.example.demo.dtos.request.ResetPasswordRequest;
 import com.example.demo.dtos.request.VerifyEmailOtpRequest;
 import com.example.demo.dtos.response.AuthResponse;
 import com.example.demo.dtos.response.OtpResponse;
-import com.example.demo.entities.Customer;
 import com.example.demo.entities.User;
 import com.example.demo.entities.enums.UserRole;
-import com.example.demo.repositories.CustomerRepository;
 import com.example.demo.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,10 +27,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailOtpService emailOtpService;
     private final JwtService jwtService;
+    private final UserProfileService userProfileService;
+    private final NotificationService notificationService;
     private final Map<String, PendingRegistration> pendingRegistrations = new ConcurrentHashMap<>();
 
     public OtpResponse register(RegisterRequest request) {
@@ -87,7 +86,7 @@ public class AuthService {
 
         User user = User.builder()
                 .username(registerRequest.getUsername())
-            .password(registerRequest.getPassword())
+                .password(registerRequest.getPassword())
                 .email(registerRequest.getEmail())
                 .phone(registerRequest.getPhone())
                 .address(registerRequest.getAddress())
@@ -96,11 +95,9 @@ public class AuthService {
                 .build();
 
         User savedUser = userRepository.save(Objects.requireNonNull(user));
-        Customer customer = Customer.builder()
-                .user(savedUser)
-                .build();
-        customerRepository.save(Objects.requireNonNull(customer));
+        userProfileService.syncProfileForRole(savedUser);
         pendingRegistrations.remove(emailKey);
+        notificationService.sendRegistrationSuccessNotification(savedUser);
 
         return Optional.of(buildAuthResponse(savedUser, "Register successful"));
     }

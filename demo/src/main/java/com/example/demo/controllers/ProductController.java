@@ -9,8 +9,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -54,6 +57,14 @@ public class ProductController {
     @PutMapping("/{id}")
     public ResponseEntity<ProductResponse> update(@PathVariable String id, @Valid @RequestBody ProductRequest request) {
         return ResponseEntity.ok(productService.updateProduct(id, request));
+    }
+
+    @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ProductResponse> uploadImages(
+            @PathVariable String id,
+            @RequestPart("files") List<MultipartFile> files,
+            @RequestParam(required = false) Integer thumbnailIndex) {
+        return ResponseEntity.ok(productService.uploadProductImages(id, files, thumbnailIndex));
     }
 
     @DeleteMapping("/{id}")

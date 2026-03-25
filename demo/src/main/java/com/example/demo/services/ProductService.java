@@ -4,6 +4,7 @@ import com.example.demo.dtos.request.ProductRequest;
 import com.example.demo.dtos.response.ProductResponse;
 import com.example.demo.entities.Category;
 import com.example.demo.entities.Product;
+import com.example.demo.entities.ProductImage;
 import com.example.demo.entities.enums.ProductStatus;
 import com.example.demo.exceptions.ResourceNotFoundException;
 import com.example.demo.repositories.CategoryRepository;
@@ -13,10 +14,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.List;
-import java.util.Collections;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -28,6 +31,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final CloudinaryService cloudinaryService;
 
     public ProductResponse createProduct(ProductRequest request) {
         if (productRepository.existsByNameAndCategoryId(request.getName(), request.getCategoryId())) {
@@ -125,6 +129,57 @@ public class ProductService {
         return toProductResponse(productRepository.save(product));
     }
 
+    public ProductResponse uploadProductImages(String productId, List<MultipartFile> files, Integer thumbnailIndex) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+
+        if (files == null || files.isEmpty()) {
+            throw new IllegalArgumentException("At least one image file is required");
+        }
+
+        List<MultipartFile> validFiles = files.stream()
+                .filter(file -> file != null && !file.isEmpty())
+                .toList();
+
+        if (validFiles.isEmpty()) {
+            throw new IllegalArgumentException("At least one non-empty image file is required");
+        }
+
+        if (thumbnailIndex != null && (thumbnailIndex < 0 || thumbnailIndex >= validFiles.size())) {
+            throw new IllegalArgumentException("thumbnailIndex is out of range");
+        }
+
+        if (thumbnailIndex != null) {
+            product.getImages().forEach(image -> image.setIsThumbnail(false));
+        }
+
+        List<ProductImage> newImages = new ArrayList<>();
+        for (int i = 0; i < validFiles.size(); i++) {
+            MultipartFile file = validFiles.get(i);
+            String imageUrl = cloudinaryService.uploadProductImage(file, product.getId());
+            boolean isThumbnail = thumbnailIndex != null && i == thumbnailIndex;
+
+            ProductImage image = ProductImage.builder()
+                    .product(product)
+                    .imageUrl(imageUrl)
+                    .altText(file.getOriginalFilename())
+                    .isThumbnail(isThumbnail)
+                    .build();
+            newImages.add(image);
+        }
+
+        product.getImages().addAll(newImages);
+
+        boolean hasThumbnail = product.getImages().stream()
+                .anyMatch(image -> Boolean.TRUE.equals(image.getIsThumbnail()));
+        if (!hasThumbnail && !product.getImages().isEmpty()) {
+            product.getImages().get(0).setIsThumbnail(true);
+        }
+
+        Product saved = productRepository.save(product);
+        return toProductResponse(saved);
+    }
+
     private void applyProductRequest(Product product, ProductRequest request, Category category) {
         product.setBrand(request.getBrand());
         product.setName(request.getName());
@@ -147,6 +202,11 @@ public class ProductService {
     }
 
     private ProductResponse toProductResponse(Product product) {
+        List<String> imageUrls = product.getImages().stream()
+                .sorted(Comparator.comparing((ProductImage image) -> !Boolean.TRUE.equals(image.getIsThumbnail())))
+                .map(ProductImage::getImageUrl)
+                .toList();
+
         return ProductResponse.builder()
                 .id(product.getId())
                 .brand(product.getBrand())
@@ -165,7 +225,7 @@ public class ProductService {
                 .status(product.getStatus())
                 .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
                 .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
-                .imageUrls(Collections.emptyList())
+                .imageUrls(imageUrls)
                 .averageRating(null)
                 .updatedAt(product.getUpdatedAt())
                 .build();
