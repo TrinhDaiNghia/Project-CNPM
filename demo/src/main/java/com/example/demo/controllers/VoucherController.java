@@ -1,11 +1,16 @@
 package com.example.demo.controllers;
 
 import com.example.demo.dtos.request.VoucherCreateRequest;
+import com.example.demo.dtos.request.VoucherSearchRequest;
+import com.example.demo.dtos.request.VoucherStatusUpdateRequest;
 import com.example.demo.dtos.request.VoucherUpdateRequest;
 import com.example.demo.entities.Voucher;
 import com.example.demo.services.VoucherService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +23,20 @@ import java.util.List;
 public class VoucherController {
 
     private final VoucherService voucherService;
+
+    @GetMapping
+    public ResponseEntity<Page<Voucher>> getAll(
+            @Valid @ModelAttribute VoucherSearchRequest request,
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(voucherService.searchVouchers(request, pageable));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<Page<Voucher>> search(
+            @Valid @ModelAttribute VoucherSearchRequest request,
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(voucherService.searchVouchers(request, pageable));
+    }
 
     @GetMapping("/active")
     public ResponseEntity<List<Voucher>> getActive() {
@@ -46,6 +65,16 @@ public class VoucherController {
     @PutMapping("/{id}")
     public ResponseEntity<Voucher> update(@PathVariable String id, @Valid @RequestBody VoucherUpdateRequest request) {
         return ResponseEntity.ok(voucherService.updateVoucher(id, request));
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Voucher> updateStatus(@PathVariable String id, @Valid @RequestBody VoucherStatusUpdateRequest request) {
+        return ResponseEntity.ok(voucherService.updateVoucherStatus(id, request));
+    }
+
+    @PatchMapping("/{id}/deactivate")
+    public ResponseEntity<Voucher> deactivate(@PathVariable String id) {
+        return ResponseEntity.ok(voucherService.disableVoucher(id));
     }
 
     @PostMapping("/apply/{code}")

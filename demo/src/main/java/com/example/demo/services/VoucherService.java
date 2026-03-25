@@ -24,8 +24,10 @@ import java.util.Optional;
 public class VoucherService {
 
     private final VoucherRepository voucherRepository;
+    private final AccessControlService accessControlService;
 
     public Voucher createVoucher(VoucherCreateRequest request) {
+        accessControlService.requireOwnerRole();
         validateVoucherCreate(request);
         if (voucherRepository.existsByCode(request.getCode().trim())) {
             throw new IllegalStateException("Voucher code already exists");
@@ -37,6 +39,7 @@ public class VoucherService {
     }
 
     public Voucher updateVoucher(String id, VoucherUpdateRequest request) {
+        accessControlService.requireOwnerRole();
         validateVoucherUpdate(request);
 
         Voucher existing = voucherRepository.findById(id)
@@ -51,6 +54,7 @@ public class VoucherService {
     }
 
     public void deleteVoucher(String id) {
+        accessControlService.requireOwnerRole();
         Voucher existing = voucherRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Voucher not found: " + id));
 
@@ -95,6 +99,7 @@ public class VoucherService {
     }
 
     public Voucher updateVoucherStatus(String id, VoucherStatusUpdateRequest request) {
+        accessControlService.requireOwnerRole();
         Voucher voucher = voucherRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Voucher not found: " + id));
 

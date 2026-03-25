@@ -25,8 +25,10 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final AccessControlService accessControlService;
 
     public Product createProduct(ProductCreateRequest request) {
+        accessControlService.requirePrivilegedRole();
         validateProductRequest(request.getPrice(), request.getStockQuantity(), request.getName(), request.getBrand());
 
         if (productRepository.existsByNameAndCategoryId(request.getName(), request.getCategoryId())) {
@@ -42,6 +44,7 @@ public class ProductService {
     }
 
     public Product updateProduct(String id, ProductUpdateRequest request) {
+        accessControlService.requirePrivilegedRole();
         validateProductRequest(request.getPrice(), request.getStockQuantity(), request.getName(), request.getBrand());
 
         Product existing = productRepository.findById(id)
@@ -61,6 +64,7 @@ public class ProductService {
     }
 
     public void deleteProduct(String id) {
+        accessControlService.requirePrivilegedRole();
         Product existing = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
 
@@ -109,6 +113,7 @@ public class ProductService {
     }
 
     public Product updateStock(String id, int quantity) {
+        accessControlService.requirePrivilegedRole();
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
         int nextQuantity = product.getStockQuantity() + quantity;

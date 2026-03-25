@@ -50,7 +50,7 @@ public class StaffService {
     }
 
     public StaffResponse updateStaff(String id, StaffUpdateRequest request) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
 
         Staff staff = staffRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Staff not found: " + id));
@@ -82,13 +82,13 @@ public class StaffService {
 
     @Transactional(readOnly = true)
     public Optional<StaffResponse> findById(String id) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
         return staffRepository.findById(id).map(DtoMapper::toStaffResponse);
     }
 
     @Transactional(readOnly = true)
     public Page<StaffResponse> searchStaff(StaffSearchRequest request, Pageable pageable) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
         return staffRepository.searchStaff(
                         normalizeSearchText(request.getFullName()),
                         normalizeSearchText(request.getEmail()),

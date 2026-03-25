@@ -24,7 +24,7 @@ public class SupplierService {
     private final AccessControlService accessControlService;
 
     public SupplierResponse createSupplier(SupplierRequest request) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
         validateSupplierUnique(request, null);
 
         Supplier supplier = new Supplier();
@@ -33,7 +33,7 @@ public class SupplierService {
     }
 
     public SupplierResponse updateSupplier(String id, SupplierRequest request) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
 
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier not found: " + id));
@@ -45,7 +45,7 @@ public class SupplierService {
     }
 
     public void deleteSupplier(String id) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
 
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier not found: " + id));
@@ -59,13 +59,13 @@ public class SupplierService {
 
     @Transactional(readOnly = true)
     public Optional<SupplierResponse> findById(String id) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
         return supplierRepository.findById(id).map(DtoMapper::toSupplierResponse);
     }
 
     @Transactional(readOnly = true)
     public Page<SupplierResponse> searchSuppliers(SupplierSearchRequest request, Pageable pageable) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
         return supplierRepository.searchSuppliers(
                         normalizeSearchText(request.getKeyword()),
                         normalizeSearchText(request.getName()),

@@ -1,6 +1,7 @@
 package com.example.demo.controllers;
 
 import com.example.demo.dtos.request.ProductCreateRequest;
+import com.example.demo.dtos.request.ProductSearchRequest;
 import com.example.demo.dtos.request.ProductUpdateRequest;
 import com.example.demo.entities.Product;
 import com.example.demo.services.ProductService;
@@ -29,9 +30,13 @@ public class ProductController {
 
     @GetMapping("/search")
     public ResponseEntity<Page<Product>> search(
-            @RequestParam String name,
+            @Valid @ModelAttribute ProductSearchRequest request,
+            @RequestParam(required = false) String specs,
             @PageableDefault(size = 10) Pageable pageable) {
-        return ResponseEntity.ok(productService.searchByName(name, pageable));
+        if ((request.getSpec() == null || request.getSpec().isBlank()) && specs != null && !specs.isBlank()) {
+            request.setSpec(specs);
+        }
+        return ResponseEntity.ok(productService.searchProducts(request, pageable));
     }
 
     @GetMapping("/{id}")
@@ -46,7 +51,7 @@ public class ProductController {
         return ResponseEntity.ok(productService.findByCategoryId(categoryId));
     }
 
-    @PostMapping("/create")
+    @PostMapping({"", "/create"})
     public ResponseEntity<Product> create(@Valid @RequestBody ProductCreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProduct(request));
     }

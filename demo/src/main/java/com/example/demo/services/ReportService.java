@@ -31,7 +31,7 @@ public class ReportService {
     private final AccessControlService accessControlService;
 
     public DashboardReportResponse getDashboardReport(ReportFilterRequest filterRequest) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
         Date fromDate = filterRequest != null ? filterRequest.getFromDate() : null;
         Date toDate = filterRequest != null ? filterRequest.getToDate() : null;
 
@@ -42,7 +42,7 @@ public class ReportService {
     }
 
     public DashboardSummaryResponse getDashboardSummary(Date fromDate, Date toDate) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
         try {
             Long totalRevenue = nonNullLong(orderRepository.sumRevenueBetween(fromDate, toDate));
             long totalOrders = orderRepository.countOrdersBetween(fromDate, toDate);
@@ -62,7 +62,7 @@ public class ReportService {
     }
 
     public DashboardStatisticResponse getDashboardStatistic(Date fromDate, Date toDate, int topLimit) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
         try {
             return DashboardStatisticResponse.builder()
                     .revenueByTime(getRevenueStatistics(fromDate, toDate))
@@ -77,7 +77,7 @@ public class ReportService {
     }
 
     public List<RevenueByTimeResponse> getRevenueStatistics(Date fromDate, Date toDate) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
         try {
             List<Object[]> rows = orderRepository.sumRevenueByDay(fromDate, toDate);
             if (rows == null || rows.isEmpty()) {
@@ -96,7 +96,7 @@ public class ReportService {
     }
 
     public List<OrdersByTimeResponse> getOrderStatisticsByDay(Date fromDate, Date toDate) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
         try {
             List<Object[]> rows = orderRepository.countOrdersByDay(fromDate, toDate);
             if (rows == null || rows.isEmpty()) {
@@ -115,7 +115,7 @@ public class ReportService {
     }
 
     public List<OrdersByTimeResponse> getOrderStatisticsByMonth(Date fromDate, Date toDate) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
         try {
             List<Object[]> rows = orderRepository.countOrdersByMonth(fromDate, toDate);
             if (rows == null || rows.isEmpty()) {
@@ -134,7 +134,7 @@ public class ReportService {
     }
 
     public List<TopSellingProductResponse> getTopSellingProducts(Date fromDate, Date toDate, int topLimit) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
         try {
             int safeLimit = topLimit <= 0 ? 5 : topLimit;
             Pageable pageable = PageRequest.of(0, safeLimit);
