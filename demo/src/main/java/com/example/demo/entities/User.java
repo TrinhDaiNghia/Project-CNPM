@@ -38,7 +38,7 @@ public class User {
     private String password;
 
     @NotBlank(message = "Full name is required")
-    @Column(name = "full_name", nullable = false, unique = true, length = 80)
+    @Column(name = "full_name", nullable = false, length = 80)
     private String fullName;
 
     @NotBlank(message = "Email is required")

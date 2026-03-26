@@ -28,12 +28,11 @@ public interface StaffRepository extends JpaRepository<Staff, String> {
     boolean existsByStaffIdAndIdNot(String staffId, String id);
 
     @Query("SELECT s FROM Staff s " +
-            "WHERE (:fullName IS NULL OR LOWER(s.fullName) LIKE LOWER(CONCAT('%', :fullName, '%'))) " +
-            "AND (:email IS NULL OR LOWER(s.email) LIKE LOWER(CONCAT('%', :email, '%'))) " +
-            "AND (:phone IS NULL OR LOWER(COALESCE(s.phone, '')) LIKE LOWER(CONCAT('%', :phone, '%')))")
-    Page<Staff> searchStaff(@Param("fullName") String fullName,
-                            @Param("email") String email,
-                            @Param("phone") String phone,
+            "WHERE (:keyword IS NULL OR " +
+            "LOWER(s.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(s.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(COALESCE(s.phone, '')) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    Page<Staff> searchStaff(@Param("keyword") String keyword,
                             Pageable pageable);
 
     @Query("SELECT CASE WHEN COUNT(n) > 0 THEN true ELSE false END FROM Notification n " +

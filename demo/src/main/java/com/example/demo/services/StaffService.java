@@ -90,9 +90,7 @@ public class StaffService {
     public Page<StaffResponse> searchStaff(StaffSearchRequest request, Pageable pageable) {
         accessControlService.requireOwnerRole();
         return staffRepository.searchStaff(
-                        normalizeSearchText(request.getFullName()),
-                        normalizeSearchText(request.getEmail()),
-                        normalizeSearchText(request.getPhone()),
+                        normalizeSearchText(request.getKeyword()),
                         pageable)
                 .map(DtoMapper::toStaffResponse);
     }
