@@ -26,7 +26,7 @@ public interface ProductRepository extends JpaRepository<Product, String> {
             "AND (:color IS NULL OR LOWER(COALESCE(p.wireColor, '')) LIKE LOWER(CONCAT('%', :color, '%')) " +
             "OR LOWER(COALESCE(p.caseColor, '')) LIKE LOWER(CONCAT('%', :color, '%')) " +
             "OR LOWER(COALESCE(p.faceColor, '')) LIKE LOWER(CONCAT('%', :color, '%'))) " +
-            "AND (:size IS NULL OR LOWER(COALESCE(p.faceSize, '')) LIKE LOWER(CONCAT('%', :size, '%'))) " +
+            "AND (:faceSize IS NULL OR LOWER(COALESCE(p.faceSize, '')) LIKE LOWER(CONCAT('%', :faceSize, '%'))) " +
             "AND (:spec IS NULL OR LOWER(COALESCE(p.movementType, '')) LIKE LOWER(CONCAT('%', :spec, '%')) " +
             "OR LOWER(COALESCE(p.glassMaterial, '')) LIKE LOWER(CONCAT('%', :spec, '%')) " +
             "OR LOWER(COALESCE(p.waterResistance, '')) LIKE LOWER(CONCAT('%', :spec, '%')) " +
@@ -36,7 +36,7 @@ public interface ProductRepository extends JpaRepository<Product, String> {
     Page<Product> searchProducts(@Param("name") String name,
                                  @Param("brand") String brand,
                                  @Param("color") String color,
-                                 @Param("size") String size,
+                                 @Param("faceSize") String faceSize,
                                  @Param("spec") String spec,
                                  @Param("status") ProductStatus status,
                                  Pageable pageable);

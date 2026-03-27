@@ -3,6 +3,7 @@ package com.example.demo.controllers;
 import com.example.demo.dtos.request.ProductCreateRequest;
 import com.example.demo.dtos.request.ProductSearchRequest;
 import com.example.demo.dtos.request.ProductUpdateRequest;
+import com.example.demo.dtos.response.ProductImageResponse;
 import com.example.demo.entities.Product;
 import com.example.demo.services.ProductService;
 import jakarta.validation.Valid;
@@ -11,8 +12,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -64,6 +67,28 @@ public class ProductController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         productService.deleteProduct(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/images")
+    public ResponseEntity<List<ProductImageResponse>> getImages(@PathVariable("id") String productId) {
+        return ResponseEntity.ok(productService.getProductImages(productId));
+    }
+
+    @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ProductImageResponse> uploadImage(
+            @PathVariable("id") String productId,
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(required = false) String altText,
+            @RequestParam(required = false) Boolean isThumbnail) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(productService.uploadProductImage(productId, file, altText, isThumbnail));
+    }
+
+    @DeleteMapping("/{id}/images/{imageId}")
+    public ResponseEntity<Void> deleteImage(@PathVariable("id") String productId,
+                                            @PathVariable String imageId) {
+        productService.deleteProductImage(productId, imageId);
         return ResponseEntity.noContent().build();
     }
 }

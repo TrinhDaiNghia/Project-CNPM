@@ -3,17 +3,21 @@ package com.example.demo.services;
 import com.example.demo.dtos.request.ProductCreateRequest;
 import com.example.demo.dtos.request.ProductSearchRequest;
 import com.example.demo.dtos.request.ProductUpdateRequest;
+import com.example.demo.dtos.response.ProductImageResponse;
 import com.example.demo.entities.Category;
 import com.example.demo.entities.Product;
+import com.example.demo.entities.ProductImage;
 import com.example.demo.entities.enums.ProductStatus;
 import com.example.demo.exceptions.ResourceNotFoundException;
 import com.example.demo.repositories.CategoryRepository;
+import com.example.demo.repositories.ProductImageRepository;
 import com.example.demo.repositories.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Optional;
@@ -24,8 +28,10 @@ import java.util.Optional;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductImageRepository productImageRepository;
     private final CategoryRepository categoryRepository;
     private final AccessControlService accessControlService;
+    private final CloudinaryService cloudinaryService;
 
     public Product createProduct(ProductCreateRequest request) {
         accessControlService.requirePrivilegedRole();
@@ -75,6 +81,54 @@ public class ProductService {
         productRepository.delete(existing);
     }
 
+    public ProductImageResponse uploadProductImage(String productId,
+                                                   MultipartFile file,
+                                                   String altText,
+                                                   Boolean isThumbnail) {
+        accessControlService.requirePrivilegedRole();
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+
+        CloudinaryService.CloudinaryUploadResult uploaded = cloudinaryService.uploadProductImage(file, productId);
+
+        if (Boolean.TRUE.equals(isThumbnail)) {
+            productImageRepository.clearThumbnailByProductId(productId);
+        }
+
+        ProductImage image = ProductImage.builder()
+                .imageUrl(uploaded.imageUrl())
+                .publicId(uploaded.publicId())
+                .altText(normalizeOptionalText(altText))
+                .isThumbnail(Boolean.TRUE.equals(isThumbnail))
+                .product(product)
+                .build();
+
+        ProductImage saved = productImageRepository.save(image);
+        return mapProductImageResponse(saved);
+    }
+
+    public void deleteProductImage(String productId, String imageId) {
+        accessControlService.requirePrivilegedRole();
+
+        ProductImage image = productImageRepository.findByIdAndProductId(imageId, productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product image not found: " + imageId));
+
+        cloudinaryService.deleteProductImage(image.getPublicId());
+        productImageRepository.delete(image);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductImageResponse> getProductImages(String productId) {
+        productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+
+        return productImageRepository.findByProductId(productId)
+                .stream()
+                .map(this::mapProductImageResponse)
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public Optional<Product> findById(String id) {
         return productRepository.findById(id);
@@ -96,7 +150,7 @@ public class ProductService {
                 normalizeSearchText(request.getName()),
                 normalizeSearchText(request.getBrand()),
                 normalizeSearchText(request.getColor()),
-                normalizeSearchText(request.getSize()),
+                normalizeSearchText(request.getFaceSize()),
                 normalizeSearchText(request.getSpec()),
                 request.getStatus(),
                 pageable);
@@ -146,6 +200,22 @@ public class ProductService {
         return value.trim();
     }
 
+    private String normalizeOptionalText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private ProductImageResponse mapProductImageResponse(ProductImage image) {
+        return ProductImageResponse.builder()
+                .id(image.getId())
+                .imageUrl(image.getImageUrl())
+                .altText(image.getAltText())
+                .isThumbnail(image.getIsThumbnail())
+                .build();
+    }
+
     private void applyProductRequest(Product product, ProductCreateRequest request, Category category) {
         applyProductFields(product, request.getBrand(), request.getName(), request.getDescription(), request.getPrice(),
                 request.getStockQuantity(), request.getMovementType(), request.getGlassMaterial(), request.getWaterResistance(),
@@ -158,6 +228,10 @@ public class ProductService {
                 request.getStockQuantity(), request.getMovementType(), request.getGlassMaterial(), request.getWaterResistance(),
                 request.getFaceSize(), request.getSize(), request.getWireMaterial(), request.getWireColor(), request.getCaseColor(),
                 request.getFaceColor(), request.getColor(), request.getSpecs(), category);
+
+        if (request.getStatus() != null) {
+            product.setStatus(request.getStatus());
+        }
     }
 
     private void applyProductFields(Product product,

@@ -4,6 +4,9 @@ import { ForbiddenPage } from '@/features/auth/pages/ForbiddenPage'
 import { LoginPage } from '@/features/auth/pages/LoginPage'
 import { CustomersPage } from '@/features/customers/pages/CustomersPage'
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage'
+import { ProductCreatePage } from '@/features/products/pages/ProductCreatePage'
+import { ProductDetailPage } from '@/features/products/pages/ProductDetailPage'
+import { ProductUpdatePage } from '@/features/products/pages/ProductUpdatePage'
 import { ProductsPage } from '@/features/products/pages/ProductsPage'
 import { ReportsPage } from '@/features/reports/pages/ReportsPage'
 import { StaffCreatePage } from '@/features/staff/pages/StaffCreatePage'
@@ -36,6 +39,9 @@ export function AppRouter() {
 
           <Route element={<RouteGuard allowedRoles={[Role.OWNER, Role.STAFF]} />}>
             <Route element={<ProductsPage />} path={ROUTES.products} />
+            <Route element={<ProductCreatePage />} path={ROUTES.productCreate} />
+            <Route element={<ProductUpdatePage />} path={ROUTES.productUpdate} />
+            <Route element={<ProductDetailPage />} path={ROUTES.productDetail} />
             <Route element={<WarrantyPage />} path={ROUTES.warranty} />
             <Route element={<CustomersPage />} path={ROUTES.customers} />
           </Route>

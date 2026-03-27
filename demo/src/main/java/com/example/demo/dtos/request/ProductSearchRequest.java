@@ -17,7 +17,7 @@ public class ProductSearchRequest {
     private String color;
 
     @Size(max = 100)
-    private String size;
+    private String faceSize;
 
     @Size(max = 1000)
     private String spec;

@@ -19,8 +19,8 @@ export function LoginPage() {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      usernameOrEmail: 'admin@watchstore.vn',
-      password: '123456',
+      usernameOrEmail: '',
+      password: '',
     },
   })
 

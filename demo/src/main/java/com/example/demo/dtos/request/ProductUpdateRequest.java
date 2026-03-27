@@ -1,5 +1,6 @@
 package com.example.demo.dtos.request;
 
+import com.example.demo.entities.enums.ProductStatus;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -62,5 +63,7 @@ public class ProductUpdateRequest {
 
     @Size(max = 1000)
     private String specs;
+
+    private ProductStatus status;
 }
 
