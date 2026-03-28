@@ -96,9 +96,11 @@ public class WarrantyService {
 
         User processor = accessControlService.getCurrentUserOrThrow();
         String processedNote = buildProcessedNote(request, processor);
+        String processedRejectReason = buildProcessedRejectReason(request, processor);
 
         warranty.setStatus(request.getStatus());
         warranty.setTechnicianNote(processedNote);
+        warranty.setRejectReason(processedRejectReason);
 
         Warranty saved = warrantyRepository.save(warranty);
         notifyCustomerIfPossible(saved, processor, request.getStatus());
@@ -119,15 +121,23 @@ public class WarrantyService {
                 ? processor.getUsername()
                 : processor.getFullName();
 
-        if (request.getStatus() == WarrantyStatus.REJECTED) {
-            return "Rejected by " + actor + ": " + request.getRejectReason().trim();
-        }
-
         if (request.getTechnicianNote() != null && !request.getTechnicianNote().isBlank()) {
             return "Processed by " + actor + ": " + request.getTechnicianNote().trim();
         }
 
         return "Processed by " + actor;
+    }
+
+    private String buildProcessedRejectReason(WarrantyProcessRequest request, User processor) {
+        if (request.getStatus() != WarrantyStatus.REJECTED) {
+            return null;
+        }
+
+        String actor = processor.getFullName() == null || processor.getFullName().isBlank()
+                ? processor.getUsername()
+                : processor.getFullName();
+
+        return "Rejected by " + actor + ": " + request.getRejectReason().trim();
     }
 
     private void notifyCustomerIfPossible(Warranty warranty, User sender, WarrantyStatus status) {

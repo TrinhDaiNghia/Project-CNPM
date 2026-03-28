@@ -1,6 +1,6 @@
-import { FeaturePlaceholder } from '@/components/feedback/FeaturePlaceholder'
+import { CustomerListPage } from '@/features/customers/pages/CustomerListPage'
 
 export function CustomersPage() {
-  return <FeaturePlaceholder description="Dang hoan thien module khach hang." title="Quan ly khach hang" />
+  return <CustomerListPage />
 }
 

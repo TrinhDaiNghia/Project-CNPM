@@ -29,7 +29,7 @@ public interface WarrantyRepository extends JpaRepository<Warranty, String> {
     int updateStatus(@Param("id") String id, @Param("status") WarrantyStatus status);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE Warranty w SET w.status = :status, w.technicianNote = :rejectReason WHERE w.id = :id")
+    @Query("UPDATE Warranty w SET w.status = :status, w.rejectReason = :rejectReason WHERE w.id = :id")
     int updateStatusAndRejectReason(@Param("id") String id,
                                     @Param("status") WarrantyStatus status,
                                     @Param("rejectReason") String rejectReason);

@@ -9,7 +9,13 @@ export const ROUTES = {
   productUpdate: '/san-pham/:id/chinh-sua',
   productDetail: '/san-pham/:id',
   warranty: '/bao-hanh',
+  warrantyCreate: '/bao-hanh/tao-moi',
+  warrantyUpdate: '/bao-hanh/:id/chinh-sua',
+  warrantyDetail: '/bao-hanh/:id',
   customers: '/khach-hang',
+  customerCreate: '/khach-hang/tao-moi',
+  customerUpdate: '/khach-hang/:id/chinh-sua',
+  customerDetail: '/khach-hang/:id',
   suppliers: '/nha-cung-cap',
   reports: '/bao-cao',
   vouchers: '/khuyen-mai',
@@ -26,5 +32,21 @@ export function getProductUpdatePath(id: string): string {
 
 export function getProductDetailPath(id: string): string {
   return `/san-pham/${id}`
+}
+
+export function getWarrantyUpdatePath(id: string): string {
+  return `/bao-hanh/${id}/chinh-sua`
+}
+
+export function getWarrantyDetailPath(id: string): string {
+  return `/bao-hanh/${id}`
+}
+
+export function getCustomerUpdatePath(id: string): string {
+  return `/khach-hang/${id}/chinh-sua`
+}
+
+export function getCustomerDetailPath(id: string): string {
+  return `/khach-hang/${id}`
 }
 

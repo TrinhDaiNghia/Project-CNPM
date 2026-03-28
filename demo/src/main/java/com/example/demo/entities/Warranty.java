@@ -63,6 +63,10 @@ public class Warranty {
 	@Column(name = "technician_note", length = 1000)
 	private String technicianNote;
 
+	@Size(max = 1000, message = "Reject reason must not exceed 1000 characters")
+	@Column(name = "reject_reason", length = 1000)
+	private String rejectReason;
+
 	@NotNull(message = "Quantity is required")
 	@Min(value = 1, message = "Quantity must be at least 1")
 	@Column(name = "quantity", nullable = false)

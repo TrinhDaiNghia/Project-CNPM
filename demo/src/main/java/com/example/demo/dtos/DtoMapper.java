@@ -115,7 +115,7 @@ public final class DtoMapper {
                 .expectedReturnDate(warranty.getExpectedReturnDate())
                 .status(warranty.getStatus())
                 .technicianNote(warranty.getTechnicianNote())
-                .rejectReason(warranty.getStatus() != null && warranty.getStatus().name().equals("REJECTED") ? warranty.getTechnicianNote() : null)
+                .rejectReason(warranty.getRejectReason())
                 .quantity(warranty.getQuantity())
                 .productId(warranty.getProductId())
                 .productName(warranty.getProduct() != null ? warranty.getProduct().getName() : null)

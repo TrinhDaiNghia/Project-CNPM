@@ -19,46 +19,46 @@ export interface MenuItemConfig {
 
 export const MENU_ITEMS: MenuItemConfig[] = [
   {
-    label: 'Nhan vien',
+    label: 'Nhân viên',
     to: ROUTES.staffList,
     allowedRoles: [Role.OWNER],
     icon: UserRoundCog,
   },
   {
-    label: 'San pham',
+    label: 'Sản phẩm',
     to: ROUTES.products,
     allowedRoles: [Role.OWNER, Role.STAFF],
     icon: Package,
   },
   {
-    label: 'Bao hanh',
+    label: 'Bảo hành',
     to: ROUTES.warranty,
     allowedRoles: [Role.OWNER, Role.STAFF],
     icon: ShieldCheck,
   },
   {
-    label: 'Khach hang',
+    label: 'Khách hàng',
     to: ROUTES.customers,
     allowedRoles: [Role.OWNER, Role.STAFF],
     icon: Users,
   },
   {
-    label: 'Nha cung cap',
+    label: 'Nhà cung cấp',
     to: ROUTES.suppliers,
     allowedRoles: [Role.OWNER, Role.ADMIN],
     icon: Truck,
   },
   {
-    label: 'Bao cao va Thong ke',
-    to: ROUTES.reports,
-    allowedRoles: [Role.OWNER],
-    icon: BarChart3,
-  },
-  {
-    label: 'Khuyen mai',
+    label: 'Khuyến mãi',
     to: ROUTES.vouchers,
     allowedRoles: [Role.OWNER],
     icon: Percent,
+  },
+  {
+    label: 'Báo cáo & Thống kê',
+    to: ROUTES.reports,
+    allowedRoles: [Role.OWNER],
+    icon: BarChart3,
   },
 ]
 

@@ -1,6 +1,5 @@
-import { FeaturePlaceholder } from '@/components/feedback/FeaturePlaceholder'
+import { WarrantyListPage } from '@/features/warranty/pages/WarrantyListPage'
 
 export function WarrantyPage() {
-  return <FeaturePlaceholder description="Dang hoan thien module bao hanh." title="Quan ly bao hanh" />
+  return <WarrantyListPage />
 }
-

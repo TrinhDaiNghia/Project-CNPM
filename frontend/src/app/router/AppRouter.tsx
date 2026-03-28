@@ -2,6 +2,9 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { RouteGuard } from '@/app/router/RouteGuard'
 import { ForbiddenPage } from '@/features/auth/pages/ForbiddenPage'
 import { LoginPage } from '@/features/auth/pages/LoginPage'
+import { CustomerCreatePage } from '@/features/customers/pages/CustomerCreatePage'
+import { CustomerDetailPage } from '@/features/customers/pages/CustomerDetailPage'
+import { CustomerUpdatePage } from '@/features/customers/pages/CustomerUpdatePage'
 import { CustomersPage } from '@/features/customers/pages/CustomersPage'
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage'
 import { ProductCreatePage } from '@/features/products/pages/ProductCreatePage'
@@ -14,7 +17,10 @@ import { StaffListPage } from '@/features/staff/pages/StaffListPage'
 import { StaffUpdatePage } from '@/features/staff/pages/StaffUpdatePage'
 import { SuppliersPage } from '@/features/suppliers/pages/SuppliersPage'
 import { VouchersPage } from '@/features/vouchers/pages/VouchersPage'
+import { WarrantyCreatePage } from '@/features/warranty/pages/WarrantyCreatePage'
+import { WarrantyDetailPage } from '@/features/warranty/pages/WarrantyDetailPage'
 import { WarrantyPage } from '@/features/warranty/pages/WarrantyPage'
+import { WarrantyUpdatePage } from '@/features/warranty/pages/WarrantyUpdatePage'
 import { DashboardLayout } from '@/layouts/DashboardLayout'
 import { ROUTES } from '@/routes/paths'
 import { Role } from '@/types/role'
@@ -43,7 +49,13 @@ export function AppRouter() {
             <Route element={<ProductUpdatePage />} path={ROUTES.productUpdate} />
             <Route element={<ProductDetailPage />} path={ROUTES.productDetail} />
             <Route element={<WarrantyPage />} path={ROUTES.warranty} />
+            <Route element={<WarrantyCreatePage />} path={ROUTES.warrantyCreate} />
+            <Route element={<WarrantyUpdatePage />} path={ROUTES.warrantyUpdate} />
+            <Route element={<WarrantyDetailPage />} path={ROUTES.warrantyDetail} />
             <Route element={<CustomersPage />} path={ROUTES.customers} />
+            <Route element={<CustomerCreatePage />} path={ROUTES.customerCreate} />
+            <Route element={<CustomerUpdatePage />} path={ROUTES.customerUpdate} />
+            <Route element={<CustomerDetailPage />} path={ROUTES.customerDetail} />
           </Route>
 
           <Route element={<RouteGuard allowedRoles={[Role.OWNER, Role.ADMIN]} />}>
@@ -56,4 +68,3 @@ export function AppRouter() {
     </Routes>
   )
 }
-
