@@ -1,6 +1,6 @@
-import { FeaturePlaceholder } from '@/components/feedback/FeaturePlaceholder'
+import { VoucherListPage } from '@/features/vouchers/pages/VoucherListPage'
 
 export function VouchersPage() {
-  return <FeaturePlaceholder description="Dang hoan thien module khuyen mai." title="Quan ly khuyen mai" />
+  return <VoucherListPage />
 }
 

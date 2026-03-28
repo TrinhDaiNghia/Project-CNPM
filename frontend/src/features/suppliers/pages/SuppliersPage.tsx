@@ -1,6 +1,6 @@
-import { FeaturePlaceholder } from '@/components/feedback/FeaturePlaceholder'
+import { SupplierListPage } from '@/features/suppliers/pages/SupplierListPage'
 
 export function SuppliersPage() {
-  return <FeaturePlaceholder description="Dang hoan thien module nha cung cap." title="Quan ly nha cung cap" />
+  return <SupplierListPage />
 }
 

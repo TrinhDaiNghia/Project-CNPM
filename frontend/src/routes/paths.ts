@@ -17,8 +17,14 @@ export const ROUTES = {
   customerUpdate: '/khach-hang/:id/chinh-sua',
   customerDetail: '/khach-hang/:id',
   suppliers: '/nha-cung-cap',
+  supplierCreate: '/nha-cung-cap/tao-moi',
+  supplierUpdate: '/nha-cung-cap/:id/chinh-sua',
+  supplierDetail: '/nha-cung-cap/:id',
   reports: '/bao-cao',
   vouchers: '/khuyen-mai',
+  voucherCreate: '/khuyen-mai/tao-moi',
+  voucherUpdate: '/khuyen-mai/:id/chinh-sua',
+  voucherDetail: '/khuyen-mai/:id',
   forbidden: '/forbidden',
 } as const
 
@@ -48,5 +54,21 @@ export function getCustomerUpdatePath(id: string): string {
 
 export function getCustomerDetailPath(id: string): string {
   return `/khach-hang/${id}`
+}
+
+export function getSupplierUpdatePath(id: string): string {
+  return `/nha-cung-cap/${id}/chinh-sua`
+}
+
+export function getSupplierDetailPath(id: string): string {
+  return `/nha-cung-cap/${id}`
+}
+
+export function getVoucherUpdatePath(id: string): string {
+  return `/khuyen-mai/${id}/chinh-sua`
+}
+
+export function getVoucherDetailPath(id: string): string {
+  return `/khuyen-mai/${id}`
 }
 

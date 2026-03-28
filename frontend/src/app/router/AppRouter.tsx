@@ -15,7 +15,13 @@ import { ReportsPage } from '@/features/reports/pages/ReportsPage'
 import { StaffCreatePage } from '@/features/staff/pages/StaffCreatePage'
 import { StaffListPage } from '@/features/staff/pages/StaffListPage'
 import { StaffUpdatePage } from '@/features/staff/pages/StaffUpdatePage'
+import { SupplierCreatePage } from '@/features/suppliers/pages/SupplierCreatePage'
+import { SupplierDetailPage } from '@/features/suppliers/pages/SupplierDetailPage'
+import { SupplierUpdatePage } from '@/features/suppliers/pages/SupplierUpdatePage'
 import { SuppliersPage } from '@/features/suppliers/pages/SuppliersPage'
+import { VoucherCreatePage } from '@/features/vouchers/pages/VoucherCreatePage'
+import { VoucherDetailPage } from '@/features/vouchers/pages/VoucherDetailPage'
+import { VoucherUpdatePage } from '@/features/vouchers/pages/VoucherUpdatePage'
 import { VouchersPage } from '@/features/vouchers/pages/VouchersPage'
 import { WarrantyCreatePage } from '@/features/warranty/pages/WarrantyCreatePage'
 import { WarrantyDetailPage } from '@/features/warranty/pages/WarrantyDetailPage'
@@ -41,6 +47,9 @@ export function AppRouter() {
             <Route element={<StaffUpdatePage />} path={ROUTES.staffUpdate} />
             <Route element={<ReportsPage />} path={ROUTES.reports} />
             <Route element={<VouchersPage />} path={ROUTES.vouchers} />
+            <Route element={<VoucherCreatePage />} path={ROUTES.voucherCreate} />
+            <Route element={<VoucherUpdatePage />} path={ROUTES.voucherUpdate} />
+            <Route element={<VoucherDetailPage />} path={ROUTES.voucherDetail} />
           </Route>
 
           <Route element={<RouteGuard allowedRoles={[Role.OWNER, Role.STAFF]} />}>
@@ -60,6 +69,9 @@ export function AppRouter() {
 
           <Route element={<RouteGuard allowedRoles={[Role.OWNER, Role.ADMIN]} />}>
             <Route element={<SuppliersPage />} path={ROUTES.suppliers} />
+            <Route element={<SupplierCreatePage />} path={ROUTES.supplierCreate} />
+            <Route element={<SupplierUpdatePage />} path={ROUTES.supplierUpdate} />
+            <Route element={<SupplierDetailPage />} path={ROUTES.supplierDetail} />
           </Route>
         </Route>
       </Route>

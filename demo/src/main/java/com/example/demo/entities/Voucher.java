@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
 import org.hibernate.annotations.UuidGenerator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 
 import java.util.Date;
 import java.util.ArrayList;
@@ -65,6 +67,7 @@ public class Voucher {
     private VoucherStatus status = VoucherStatus.ACTIVE;
 
     @OneToMany(mappedBy = "voucher", fetch = FetchType.LAZY)
+    @JsonIgnore
     @Builder.Default
     private List<Order> orders = new ArrayList<>();
 }
