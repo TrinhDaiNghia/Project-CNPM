@@ -38,10 +38,7 @@ public class AuthService {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalStateException("Email already exists");
         }
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new IllegalStateException("Username already exists");
-        }
-
+         
         RegisterRequest pendingRequest = copyRegisterRequest(request);
         pendingRequest.setPassword(passwordEncoder.encode(request.getPassword()));
 
@@ -104,7 +101,7 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public Optional<AuthResponse> login(LoginRequest request) {
-        Optional<User> optionalUser = findByUsernameOrEmail(request.getUsernameOrEmail());
+        Optional<User> optionalUser = userRepository.findByEmail(request.getEmail());
         if (optionalUser.isEmpty()) {
             return Optional.empty();
         }
@@ -145,11 +142,6 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
         return true;
-    }
-
-    private Optional<User> findByUsernameOrEmail(String value) {
-        Optional<User> byEmail = userRepository.findByEmail(value);
-        return byEmail.isPresent() ? byEmail : userRepository.findByUsername(value);
     }
 
     private AuthResponse buildAuthResponse(User user, String message) {
