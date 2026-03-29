@@ -1,6 +1,7 @@
 package com.example.demo.entities;
 
 import com.example.demo.entities.enums.VoucherStatus;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -65,6 +66,10 @@ public class Voucher {
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private VoucherStatus status = VoucherStatus.ACTIVE;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
 
     @OneToMany(mappedBy = "voucher", fetch = FetchType.LAZY)
     @JsonIgnore

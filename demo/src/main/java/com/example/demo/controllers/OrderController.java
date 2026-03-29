@@ -1,5 +1,6 @@
 package com.example.demo.controllers;
 
+import com.example.demo.dtos.request.OrderRequest;
 import com.example.demo.entities.Order;
 import com.example.demo.entities.enums.OrderStatus;
 import com.example.demo.services.OrderService;
@@ -34,8 +35,8 @@ public class OrderController {
     }
 
     @PostMapping
-    public ResponseEntity<Order> create(@Valid @RequestBody Order order) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.createOrder(order));
+    public ResponseEntity<Order> create(@Valid @RequestBody OrderRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.createOrder(request));
     }
 
     @PatchMapping("/{id}/status")
@@ -51,3 +52,4 @@ public class OrderController {
         return ResponseEntity.noContent().build();
     }
 }
+

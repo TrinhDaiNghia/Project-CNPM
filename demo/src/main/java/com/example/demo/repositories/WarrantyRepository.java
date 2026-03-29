@@ -9,6 +9,10 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
 
 @Repository
 public interface WarrantyRepository extends JpaRepository<Warranty, String> {
@@ -33,5 +37,17 @@ public interface WarrantyRepository extends JpaRepository<Warranty, String> {
     int updateStatusAndRejectReason(@Param("id") String id,
                                     @Param("status") WarrantyStatus status,
                                     @Param("rejectReason") String rejectReason);
-}
 
+    List<Warranty> findByCustomerId(String customerId);
+
+    List<Warranty> findByStatus(WarrantyStatus status);
+
+    List<Warranty> findByCustomerIdAndStatus(String customerId, WarrantyStatus status);
+
+    boolean existsByCustomerIdAndOrderIdAndProductIdAndStatus(
+            String customerId,
+            String orderId,
+            String productId,
+            WarrantyStatus status
+    );
+}

@@ -6,6 +6,7 @@ import com.example.demo.dtos.response.DashboardSummaryResponse;
 import com.example.demo.dtos.response.OrdersByTimeResponse;
 import com.example.demo.dtos.response.RevenueByTimeResponse;
 import com.example.demo.dtos.response.TopSellingProductResponse;
+import com.example.demo.dtos.response.ReportSummaryResponse;
 import com.example.demo.services.ReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -16,7 +17,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Date;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/reports")

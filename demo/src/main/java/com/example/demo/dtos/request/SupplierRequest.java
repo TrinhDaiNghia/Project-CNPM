@@ -8,14 +8,12 @@ import lombok.Data;
 public class SupplierRequest {
 
     @NotBlank(message = "Supplier name is required")
-    @Size(max = 100)
+    @Size(max = 100, message = "Supplier name must not exceed 100 characters")
     private String name;
 
-
-    @Size(max = 500)
+    @Size(max = 500, message = "Contract info must not exceed 500 characters")
     private String contractInfo;
 
-    @Size(max = 255)
+    @Size(max = 255, message = "Address must not exceed 255 characters")
     private String address;
 }
-
