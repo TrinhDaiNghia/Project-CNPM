@@ -90,6 +90,8 @@ public class ProductController {
                                             @PathVariable String imageId) {
         productService.deleteProductImage(productId, imageId);
         return ResponseEntity.noContent().build();
+    }
+    
     @GetMapping("/compare")
     public ResponseEntity<List<Product>> compare(@RequestParam String productAId, @RequestParam String productBId) {
         return ResponseEntity.ok(productService.compareProducts(productAId, productBId));
