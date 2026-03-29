@@ -24,6 +24,7 @@ public class Supplier {
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
+
     @Size(max = 500, message = "Contract info must not exceed 500 characters")
     @Column(name = "contract_info", length = 500)
     private String contractInfo;

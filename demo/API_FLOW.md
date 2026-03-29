@@ -39,11 +39,15 @@
 | Method | Endpoint | Mo ta |
 |---|---|---|
 | GET | /api/products | Lay danh sach san pham con kinh doanh |
-| GET | /api/products/search?name={name}&page={p}&size={s} | Tim san pham theo ten (phan trang) |
+| GET | /api/products/search?name={name}&brand={brand}&color={color}&faceSize={faceSize}&spec={spec}&status={status}&page={p}&size={s} | Tim kiem san pham theo bo loc (phan trang, `size` la page size) |
 | GET | /api/products/{id} | Lay san pham theo id |
+| GET | /api/products/{id}/images | Lay danh sach anh cua san pham |
 | GET | /api/products/category/{categoryId} | Lay san pham theo category |
+| POST | /api/products | Tao san pham |
+| POST | /api/products/{id}/images (multipart/form-data) | Upload anh cho san pham |
 | POST | /api/products/create | Tao san pham |
 | PUT | /api/products/{id} | Cap nhat san pham |
+| DELETE | /api/products/{id}/images/{imageId} | Xoa anh cua san pham |
 | DELETE | /api/products/{id} | Xoa san pham |
 
 ### Cart (/api/cart)

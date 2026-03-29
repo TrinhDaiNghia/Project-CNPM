@@ -32,144 +32,145 @@ import java.util.List;
 public class WarrantyService {
 
     private final WarrantyRepository warrantyRepository;
-    private final CustomerRepository customerRepository;
-    private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final CustomerRepository customerRepository;
+    private final NotificationRepository notificationRepository;
     private final AccessControlService accessControlService;
 
-    public WarrantyResponse createWarranty(WarrantyRequest request) {
-        User currentUser = accessControlService.getCurrentUserOrThrow();
-        if (currentUser.getRole() != UserRole.CUSTOMER) {
-            throw new AccessDeniedException("Only CUSTOMER can create warranty requests");
-        }
+    public WarrantyResponse createWarrantyRequest(WarrantyRequest request) {
+        accessControlService.requirePrivilegedRole();
 
-        accessControlService.requireCustomerAccess(request.getCustomerId());
-
-        Customer customer = customerRepository.findById(request.getCustomerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + request.getCustomerId()));
-        Order order = orderRepository.findById(request.getOrderId())
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + request.getOrderId()));
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + request.getProductId()));
 
-        if (!order.getCustomer().getId().equals(customer.getId())) {
-            throw new IllegalArgumentException("This order does not belong to the provided customer");
-        }
+        Warranty warranty = new Warranty();
+        warranty.setCustomerPhone(request.getCustomerPhone().trim());
+        warranty.setCustomerName(request.getCustomerName().trim());
+        warranty.setIssueDescription(request.getIssueDescription().trim());
+        warranty.setReceivedDate(request.getReceivedDate());
+        warranty.setExpectedReturnDate(request.getExpectedReturnDate());
+        warranty.setQuantity(request.getQuantity());
+        warranty.setTechnicianNote(normalizeBlankToNull(request.getTechnicianNote()));
+        warranty.setStatus(request.getStatus() == null ? WarrantyStatus.RECEIVED : request.getStatus());
+        warranty.setProduct(product);
 
-        if (order.getStatus() != OrderStatus.DELIVERED && order.getStatus() != OrderStatus.COMPLETED) {
-            throw new IllegalStateException("Warranty is available only for completed orders");
-        }
-
-        boolean productInOrder = order.getOrderItems().stream()
-                .map(OrderItem::getProduct)
-                .anyMatch(itemProduct -> itemProduct.getId().equals(product.getId()));
-        if (!productInOrder) {
-            throw new IllegalArgumentException("This product is not found in the selected order");
-        }
-
-        boolean pendingExists = warrantyRepository.existsByCustomerIdAndOrderIdAndProductIdAndStatus(
-                request.getCustomerId(),
-                request.getOrderId(),
-                request.getProductId(),
-                WarrantyStatus.PENDING
-        );
-        if (pendingExists) {
-            throw new IllegalStateException("A pending warranty request already exists for this product/order");
-        }
-
-        Warranty warranty = Warranty.builder()
-                .customer(customer)
-                .order(order)
-                .product(product)
-                .issueDescription(request.getIssueDescription().trim())
-                .quantity(request.getQuantity())
-                .status(WarrantyStatus.PENDING)
-                .build();
-
-        Warranty saved = warrantyRepository.save(warranty);
-        return toResponse(saved);
+        return DtoMapper.toWarrantyResponse(warrantyRepository.save(warranty));
     }
 
-    public WarrantyResponse updateStatus(String id, WarrantyStatusUpdateRequest request) {
+    @Transactional(readOnly = true)
+    public Optional<WarrantyResponse> getWarrantyRequestDetail(String id) {
+        accessControlService.requirePrivilegedRole();
+        return warrantyRepository.findById(id).map(DtoMapper::toWarrantyResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<WarrantyResponse> searchWarrantyRequests(WarrantySearchRequest request, Pageable pageable) {
+        accessControlService.requirePrivilegedRole();
+        return warrantyRepository.searchWarrantyRequests(normalizeSearchText(request.getKeyword()), request.getStatus(), pageable)
+                .map(DtoMapper::toWarrantyResponse);
+    }
+
+    public WarrantyResponse approveWarrantyRequest(String id, String technicianNote) {
+        WarrantyProcessRequest processRequest = new WarrantyProcessRequest();
+        processRequest.setStatus(WarrantyStatus.COMPLETED);
+        processRequest.setTechnicianNote(technicianNote);
+        return processWarrantyRequest(id, processRequest);
+    }
+
+    public WarrantyResponse rejectWarrantyRequest(String id, String rejectReason) {
+        WarrantyProcessRequest processRequest = new WarrantyProcessRequest();
+        processRequest.setStatus(WarrantyStatus.REJECTED);
+        processRequest.setRejectReason(rejectReason);
+        return processWarrantyRequest(id, processRequest);
+    }
+
+    public WarrantyResponse processWarrantyRequest(String id, WarrantyProcessRequest request) {
         accessControlService.requirePrivilegedRole();
 
-        if (request.getStatus() == WarrantyStatus.PENDING) {
-            throw new IllegalArgumentException("Warranty status can only be APPROVED or REJECTED");
-        }
-        if (request.getStatus() == WarrantyStatus.REJECTED && !StringUtils.hasText(request.getResolutionNote())) {
-            throw new IllegalArgumentException("Resolution note is required when rejecting a warranty request");
-        }
-
         Warranty warranty = warrantyRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Warranty not found: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Warranty request not found: " + id));
 
-        User handler = accessControlService.getCurrentUserOrThrow();
+        validateTransition(warranty.getStatus(), request.getStatus());
+        if (request.getStatus() == WarrantyStatus.REJECTED
+                && (request.getRejectReason() == null || request.getRejectReason().isBlank())) {
+            throw new IllegalArgumentException("Reject reason is required when rejecting warranty request");
+        }
+
+        User processor = accessControlService.getCurrentUserOrThrow();
+        String processedNote = buildProcessedNote(request, processor);
+        String processedRejectReason = buildProcessedRejectReason(request, processor);
+
         warranty.setStatus(request.getStatus());
-        warranty.setResolutionNote(trimToNull(request.getResolutionNote()));
-        warranty.setProcessedAt(new Date());
-        warranty.setProcessedBy(handler);
+        warranty.setTechnicianNote(processedNote);
+        warranty.setRejectReason(processedRejectReason);
 
         Warranty saved = warrantyRepository.save(warranty);
-        return toResponse(saved);
+        notifyCustomerIfPossible(saved, processor, request.getStatus());
+        return DtoMapper.toWarrantyResponse(saved);
     }
 
-    @Transactional(readOnly = true)
-    public WarrantyResponse findById(String id) {
-        Warranty warranty = warrantyRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Warranty not found: " + id));
-        validateReadAccess(warranty);
-        return toResponse(warranty);
+    private void validateTransition(WarrantyStatus currentStatus, WarrantyStatus nextStatus) {
+        if (nextStatus == null) {
+            throw new IllegalArgumentException("Warranty status is required");
+        }
+        if (currentStatus == WarrantyStatus.COMPLETED || currentStatus == WarrantyStatus.REJECTED) {
+            throw new IllegalStateException("Cannot process warranty request with final status: " + currentStatus);
+        }
     }
 
-    @Transactional(readOnly = true)
-    public List<WarrantyResponse> findAll(String customerId, WarrantyStatus status) {
-        List<Warranty> warranties;
-        if (StringUtils.hasText(customerId)) {
-            accessControlService.requireCustomerAccess(customerId);
-            warranties = status == null
-                    ? warrantyRepository.findByCustomerId(customerId)
-                    : warrantyRepository.findByCustomerIdAndStatus(customerId, status);
-        } else {
-            accessControlService.requirePrivilegedRole();
-            warranties = status == null
-                    ? warrantyRepository.findAll()
-                    : warrantyRepository.findByStatus(status);
+    private String buildProcessedNote(WarrantyProcessRequest request, User processor) {
+        String actor = processor.getFullName() == null || processor.getFullName().isBlank()
+                ? processor.getUsername()
+                : processor.getFullName();
+
+        if (request.getTechnicianNote() != null && !request.getTechnicianNote().isBlank()) {
+            return "Processed by " + actor + ": " + request.getTechnicianNote().trim();
         }
 
-        return warranties.stream()
-                .map(this::toResponse)
-                .toList();
+        return "Processed by " + actor;
     }
 
-    private void validateReadAccess(Warranty warranty) {
-        User user = accessControlService.getCurrentUserOrThrow();
-        if (user.getRole() == UserRole.CUSTOMER) {
-            accessControlService.requireCustomerAccess(warranty.getCustomer().getId());
+    private String buildProcessedRejectReason(WarrantyProcessRequest request, User processor) {
+        if (request.getStatus() != WarrantyStatus.REJECTED) {
+            return null;
+        }
+
+        String actor = processor.getFullName() == null || processor.getFullName().isBlank()
+                ? processor.getUsername()
+                : processor.getFullName();
+
+        return "Rejected by " + actor + ": " + request.getRejectReason().trim();
+    }
+
+    private void notifyCustomerIfPossible(Warranty warranty, User sender, WarrantyStatus status) {
+        Optional<Customer> customerOpt = customerRepository.findByPhone(warranty.getCustomerPhone());
+        if (customerOpt.isEmpty()) {
             return;
         }
-        accessControlService.requirePrivilegedRole();
-    }
 
-    private WarrantyResponse toResponse(Warranty warranty) {
-        return WarrantyResponse.builder()
-                .id(warranty.getId())
-                .customerId(warranty.getCustomer().getId())
-                .orderId(warranty.getOrder().getId())
-                .productId(warranty.getProduct().getId())
-                .productName(warranty.getProduct().getName())
-                .quantity(warranty.getQuantity())
-                .issueDescription(warranty.getIssueDescription())
-                .status(warranty.getStatus())
-                .resolutionNote(warranty.getResolutionNote())
-                .requestedAt(warranty.getRequestedAt())
-                .processedAt(warranty.getProcessedAt())
-                .processedByUserId(warranty.getProcessedBy() != null ? warranty.getProcessedBy().getId() : null)
-                .processedByUsername(warranty.getProcessedBy() != null ? warranty.getProcessedBy().getUsername() : null)
+        String content = status == WarrantyStatus.REJECTED
+                ? "Your warranty request has been rejected. Please check details from support."
+                : "Your warranty request has been updated to status: " + status;
+
+        Notification notification = Notification.builder()
+                .title("Warranty request update")
+                .content(content)
+                .sender(sender)
+                .receiver(customerOpt.get())
                 .build();
+
+        notificationRepository.save(notification);
     }
 
-    private String trimToNull(String value) {
-        if (!StringUtils.hasText(value)) {
+    private String normalizeSearchText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private String normalizeBlankToNull(String value) {
+        if (value == null || value.isBlank()) {
             return null;
         }
         return value.trim();

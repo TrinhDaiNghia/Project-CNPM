@@ -62,6 +62,7 @@ public class UserService {
 
         // Password updates are intentionally handled by auth flow (OTP/reset-password).
         existing.setUsername(user.getUsername());
+        existing.setFullName(user.getFullName());
         existing.setEmail(user.getEmail());
         existing.setPhone(user.getPhone());
         existing.setAddress(user.getAddress());
