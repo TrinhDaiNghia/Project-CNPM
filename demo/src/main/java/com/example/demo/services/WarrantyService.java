@@ -4,35 +4,25 @@ import com.example.demo.dtos.DtoMapper;
 import com.example.demo.dtos.request.WarrantyProcessRequest;
 import com.example.demo.dtos.request.WarrantyRequest;
 import com.example.demo.dtos.request.WarrantySearchRequest;
-import com.example.demo.dtos.request.WarrantyStatusUpdateRequest;
 import com.example.demo.dtos.response.WarrantyResponse;
 import com.example.demo.entities.Customer;
 import com.example.demo.entities.Notification;
-import com.example.demo.entities.Order;
-import com.example.demo.entities.OrderItem;
 import com.example.demo.entities.Product;
 import com.example.demo.entities.User;
 import com.example.demo.entities.Warranty;
-import com.example.demo.entities.enums.OrderStatus;
-import com.example.demo.entities.enums.UserRole;
 import com.example.demo.entities.enums.WarrantyStatus;
 import com.example.demo.exceptions.ResourceNotFoundException;
 import com.example.demo.repositories.CustomerRepository;
 import com.example.demo.repositories.NotificationRepository;
-import com.example.demo.repositories.OrderRepository;
 import com.example.demo.repositories.ProductRepository;
 import com.example.demo.repositories.WarrantyRepository;
 import lombok.RequiredArgsConstructor;
 
-import org.hibernate.query.Page;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
-import java.util.Date;
-import java.util.List;
 import java.util.Optional;
 
 @Service
