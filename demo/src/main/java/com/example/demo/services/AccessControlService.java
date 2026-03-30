@@ -64,7 +64,7 @@ public class AccessControlService {
 
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + customerId));
-        if (!customer.getUser().getId().equals(currentUser.getId())) {
+        if (!customer.getId().equals(currentUser.getId())) {
             throw new AccessDeniedException("You are not allowed to access this customer");
         }
     }

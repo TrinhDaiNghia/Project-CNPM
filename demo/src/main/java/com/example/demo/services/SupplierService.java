@@ -1,18 +1,18 @@
 package com.example.demo.services;
 
+import com.example.demo.dtos.DtoMapper;
 import com.example.demo.dtos.request.SupplierRequest;
-import com.example.demo.entities.ImportReceipt;
+import com.example.demo.dtos.request.SupplierSearchRequest;
+import com.example.demo.dtos.response.SupplierResponse;
 import com.example.demo.entities.Supplier;
 import com.example.demo.exceptions.ResourceNotFoundException;
-import com.example.demo.repositories.ImportReceiptRepository;
 import com.example.demo.repositories.SupplierRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
-import java.util.Comparator;
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -21,34 +21,27 @@ import java.util.Optional;
 public class SupplierService {
 
     private final SupplierRepository supplierRepository;
-    private final ImportReceiptRepository importReceiptRepository;
     private final AccessControlService accessControlService;
 
-    public Supplier createSupplier(SupplierRequest request) {
+    public SupplierResponse createSupplier(SupplierRequest request) {
         accessControlService.requireOwnerRole();
-
-        if (supplierRepository.existsByName(request.getName().trim())) {
-            throw new IllegalStateException("Supplier name already exists");
-        }
+        validateSupplierUnique(request, null);
 
         Supplier supplier = new Supplier();
         applySupplierRequest(supplier, request);
-        return supplierRepository.save(supplier);
+        return DtoMapper.toSupplierResponse(supplierRepository.save(supplier));
     }
 
-    public Supplier updateSupplier(String id, SupplierRequest request) {
+    public SupplierResponse updateSupplier(String id, SupplierRequest request) {
         accessControlService.requireOwnerRole();
 
-        Supplier existing = supplierRepository.findById(id)
+        Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier not found: " + id));
 
-        boolean changedName = !existing.getName().equalsIgnoreCase(request.getName().trim());
-        if (changedName && supplierRepository.existsByName(request.getName().trim())) {
-            throw new IllegalStateException("Supplier name already exists");
-        }
+        validateSupplierUnique(request, id);
+        applySupplierRequest(supplier, request);
 
-        applySupplierRequest(existing, request);
-        return supplierRepository.save(existing);
+        return DtoMapper.toSupplierResponse(supplierRepository.save(supplier));
     }
 
     public void deleteSupplier(String id) {
@@ -57,56 +50,61 @@ public class SupplierService {
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier not found: " + id));
 
-        List<ImportReceipt> linkedReceipts = importReceiptRepository.findBySupplierId(id);
-        if (!linkedReceipts.isEmpty()) {
-            throw new IllegalStateException("Cannot delete supplier because it is linked to import receipts");
+        if (supplierRepository.existsRelatedRecords(id)) {
+            throw new IllegalStateException("Cannot delete supplier because related import records exist");
         }
 
         supplierRepository.delete(supplier);
     }
 
     @Transactional(readOnly = true)
-    public Optional<Supplier> findById(String id) {
+    public Optional<SupplierResponse> findById(String id) {
         accessControlService.requireOwnerRole();
-        return supplierRepository.findById(id);
+        return supplierRepository.findById(id).map(DtoMapper::toSupplierResponse);
     }
 
     @Transactional(readOnly = true)
-    public List<Supplier> findAll() {
+    public Page<SupplierResponse> searchSuppliers(SupplierSearchRequest request, Pageable pageable) {
         accessControlService.requireOwnerRole();
-        return supplierRepository.findAll().stream()
-                .sorted(Comparator.comparing(Supplier::getName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
+        return supplierRepository.searchSuppliers(
+                        normalizeSearchText(request.getKeyword()),
+                        normalizeSearchText(request.getName()),
+                        normalizeSearchText(request.getContractInfo()),
+                        normalizeSearchText(request.getAddress()),
+                        pageable)
+                .map(DtoMapper::toSupplierResponse);
     }
 
-    @Transactional(readOnly = true)
-    public List<Supplier> search(String keyword) {
-        accessControlService.requireOwnerRole();
-        if (!StringUtils.hasText(keyword)) {
-            return findAll();
+    private void validateSupplierUnique(SupplierRequest request, String supplierId) {
+        String normalizedName = request.getName().trim();
+
+        if (supplierId == null) {
+            if (supplierRepository.existsByName(normalizedName)) {
+                throw new IllegalStateException("Supplier name already exists");
+            }
+            return;
         }
 
-        String normalized = keyword.trim().toLowerCase();
-        return supplierRepository.findAll().stream()
-                .filter(supplier -> containsIgnoreCase(supplier.getName(), normalized)
-                        || containsIgnoreCase(supplier.getAddress(), normalized)
-                        || containsIgnoreCase(supplier.getContractInfo(), normalized))
-                .sorted(Comparator.comparing(Supplier::getName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
+        if (supplierRepository.existsByNameAndIdNot(normalizedName, supplierId)) {
+            throw new IllegalStateException("Supplier name already exists");
+        }
     }
 
     private void applySupplierRequest(Supplier supplier, SupplierRequest request) {
         supplier.setName(request.getName().trim());
-        supplier.setAddress(trimToNull(request.getAddress()));
-        supplier.setContractInfo(trimToNull(request.getContractInfo()));
+        supplier.setContractInfo(normalizeBlankToNull(request.getContractInfo()));
+        supplier.setAddress(normalizeBlankToNull(request.getAddress()));
     }
 
-    private boolean containsIgnoreCase(String value, String keyword) {
-        return value != null && value.toLowerCase().contains(keyword);
+    private String normalizeSearchText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
-    private String trimToNull(String value) {
-        if (!StringUtils.hasText(value)) {
+    private String normalizeBlankToNull(String value) {
+        if (value == null || value.isBlank()) {
             return null;
         }
         return value.trim();

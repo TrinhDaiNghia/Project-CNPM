@@ -1,7 +1,10 @@
 package com.example.demo.controllers;
 
-import com.example.demo.dtos.request.ProductRequest;
-import com.example.demo.dtos.response.ProductResponse;
+import com.example.demo.dtos.request.ProductCreateRequest;
+import com.example.demo.dtos.request.ProductSearchRequest;
+import com.example.demo.dtos.request.ProductUpdateRequest;
+import com.example.demo.dtos.response.ProductImageResponse;
+import com.example.demo.entities.Product;
 import com.example.demo.services.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,10 +34,14 @@ public class ProductController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<Page<ProductResponse>> search(
-            @RequestParam String name,
+    public ResponseEntity<Page<Product>> search(
+            @Valid @ModelAttribute ProductSearchRequest request,
+            @RequestParam(required = false) String specs,
             @PageableDefault(size = 10) Pageable pageable) {
-        return ResponseEntity.ok(productService.searchByName(name, pageable));
+        if ((request.getSpec() == null || request.getSpec().isBlank()) && specs != null && !specs.isBlank()) {
+            request.setSpec(specs);
+        }
+        return ResponseEntity.ok(productService.searchProducts(request, pageable));
     }
 
     @GetMapping("/{id}")
@@ -49,13 +56,13 @@ public class ProductController {
         return ResponseEntity.ok(productService.findByCategoryId(categoryId));
     }
 
-    @PostMapping("/create")
-    public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
+    @PostMapping({"", "/create"})
+    public ResponseEntity<Product> create(@Valid @RequestBody ProductCreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProduct(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ProductResponse> update(@PathVariable String id, @Valid @RequestBody ProductRequest request) {
+    public ResponseEntity<Product> update(@PathVariable String id, @Valid @RequestBody ProductUpdateRequest request) {
         return ResponseEntity.ok(productService.updateProduct(id, request));
     }
 
@@ -73,8 +80,30 @@ public class ProductController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/{id}/images")
+    public ResponseEntity<List<ProductImageResponse>> getImages(@PathVariable("id") String productId) {
+        return ResponseEntity.ok(productService.getProductImages(productId));
+    }
+
+    @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ProductImageResponse> uploadImage(
+            @PathVariable("id") String productId,
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(required = false) String altText,
+            @RequestParam(required = false) Boolean isThumbnail) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(productService.uploadProductImage(productId, file, altText, isThumbnail));
+    }
+
+    @DeleteMapping("/{id}/images/{imageId}")
+    public ResponseEntity<Void> deleteImage(@PathVariable("id") String productId,
+                                            @PathVariable String imageId) {
+        productService.deleteProductImage(productId, imageId);
+        return ResponseEntity.noContent().build();
+    }
+    
     @GetMapping("/compare")
-    public ResponseEntity<List<ProductResponse>> compare(@RequestParam String productAId, @RequestParam String productBId) {
+    public ResponseEntity<List<Product>> compare(@RequestParam String productAId, @RequestParam String productBId) {
         return ResponseEntity.ok(productService.compareProducts(productAId, productBId));
     }
 }

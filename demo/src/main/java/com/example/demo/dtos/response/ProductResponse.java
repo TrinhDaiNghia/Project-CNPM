@@ -25,6 +25,9 @@ public class ProductResponse {
     private String wireColor;
     private String caseColor;
     private String faceColor;
+    private String color;
+    private String size;
+    private String specs;
     private ProductStatus status;
     private String categoryId;
     private String categoryName;

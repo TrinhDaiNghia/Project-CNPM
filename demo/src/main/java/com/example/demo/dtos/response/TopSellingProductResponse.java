@@ -9,6 +9,6 @@ public class TopSellingProductResponse {
 
     private String productId;
     private String productName;
-    private Long quantitySold;
-    private Long revenue;
+    private Long soldQuantity;
 }
+

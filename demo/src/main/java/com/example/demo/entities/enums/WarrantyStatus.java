@@ -1,7 +1,9 @@
 package com.example.demo.entities.enums;
 
 public enum WarrantyStatus {
-    PENDING,
-    APPROVED,
+    RECEIVED,
+    PROCESSING,
+    COMPLETED,
     REJECTED
 }
+

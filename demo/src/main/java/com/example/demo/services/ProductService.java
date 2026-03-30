@@ -1,13 +1,16 @@
 package com.example.demo.services;
 
-import com.example.demo.dtos.request.ProductRequest;
-import com.example.demo.dtos.response.ProductResponse;
+import com.example.demo.dtos.request.ProductCreateRequest;
+import com.example.demo.dtos.request.ProductSearchRequest;
+import com.example.demo.dtos.request.ProductUpdateRequest;
+import com.example.demo.dtos.response.ProductImageResponse;
 import com.example.demo.entities.Category;
 import com.example.demo.entities.Product;
 import com.example.demo.entities.ProductImage;
 import com.example.demo.entities.enums.ProductStatus;
 import com.example.demo.exceptions.ResourceNotFoundException;
 import com.example.demo.repositories.CategoryRepository;
+import com.example.demo.repositories.ProductImageRepository;
 import com.example.demo.repositories.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -16,8 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Map;
 import java.util.List;
 import java.util.Optional;
@@ -30,10 +31,15 @@ import java.util.stream.Collectors;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductImageRepository productImageRepository;
     private final CategoryRepository categoryRepository;
+    private final AccessControlService accessControlService;
     private final CloudinaryService cloudinaryService;
 
-    public ProductResponse createProduct(ProductRequest request) {
+    public Product createProduct(ProductCreateRequest request) {
+        accessControlService.requirePrivilegedRole();
+        validateProductRequest(request.getPrice(), request.getStockQuantity(), request.getName(), request.getBrand());
+
         if (productRepository.existsByNameAndCategoryId(request.getName(), request.getCategoryId())) {
             throw new IllegalStateException("Product already exists in this category");
         }
@@ -46,7 +52,10 @@ public class ProductService {
         return toProductResponse(productRepository.save(product));
     }
 
-    public ProductResponse updateProduct(String id, ProductRequest request) {
+    public Product updateProduct(String id, ProductUpdateRequest request) {
+        accessControlService.requirePrivilegedRole();
+        validateProductRequest(request.getPrice(), request.getStockQuantity(), request.getName(), request.getBrand());
+
         Product existing = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
 
@@ -64,10 +73,84 @@ public class ProductService {
     }
 
     public void deleteProduct(String id) {
-        if (!productRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Product not found: " + id);
+        accessControlService.requirePrivilegedRole();
+        Product existing = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
+
+        if (productRepository.existsRelatedTransactions(id)) {
+            throw new IllegalStateException("Cannot delete product because it is referenced in order transactions");
         }
-        productRepository.deleteById(id);
+
+        productRepository.delete(existing);
+    }
+
+    public ProductImageResponse uploadProductImage(String productId,
+                                                   MultipartFile file,
+                                                   String altText,
+                                                   Boolean isThumbnail) {
+        accessControlService.requirePrivilegedRole();
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+
+        CloudinaryService.CloudinaryUploadResult uploaded = cloudinaryService.uploadProductImage(file, productId);
+
+        if (Boolean.TRUE.equals(isThumbnail)) {
+            productImageRepository.clearThumbnailByProductId(productId);
+        }
+
+        ProductImage image = ProductImage.builder()
+                .imageUrl(uploaded.imageUrl())
+                .publicId(uploaded.publicId())
+                .altText(normalizeOptionalText(altText))
+                .isThumbnail(Boolean.TRUE.equals(isThumbnail))
+                .product(product)
+                .build();
+
+        ProductImage saved = productImageRepository.save(image);
+        return mapProductImageResponse(saved);
+    }
+
+    public void deleteProductImage(String productId, String imageId) {
+        accessControlService.requirePrivilegedRole();
+
+        ProductImage image = productImageRepository.findByIdAndProductId(imageId, productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product image not found: " + imageId));
+
+        cloudinaryService.deleteProductImage(image.getPublicId());
+        productImageRepository.delete(image);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductImageResponse> getProductImages(String productId) {
+        productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+
+        return productImageRepository.findByProductId(productId)
+                .stream()
+                .map(this::mapProductImageResponse)
+                .toList();
+    }
+
+    public List<Product> compareProducts(String productAId, String productBId) {
+        if (productAId == null || productAId.isBlank() || productBId == null || productBId.isBlank()) {
+            throw new IllegalArgumentException("Both product IDs are required");
+        }
+
+        if (productAId.equals(productBId)) {
+            throw new IllegalArgumentException("Cannot compare the same product: " + productAId);
+        }
+
+        Map<String, Product> productsById = productRepository.findAllById(List.of(productAId, productBId))
+                .stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity(), (left, right) -> left));
+
+        Product productA = Optional.ofNullable(productsById.get(productAId))
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productAId));
+        Product productB = Optional.ofNullable(productsById.get(productBId))
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productBId));
+
+        return List.of(productA, productB);
     }
 
     public List<ProductResponse> compareProducts(String productAId, String productBId) {
@@ -104,8 +187,20 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ProductResponse> searchByName(String name, Pageable pageable) {
-        return productRepository.findByNameContainingIgnoreCase(name, pageable).map(this::toProductResponse);
+    public Page<Product> searchProducts(ProductSearchRequest request, Pageable pageable) {
+        return productRepository.searchProducts(
+                normalizeSearchText(request.getName()),
+                normalizeSearchText(request.getBrand()),
+                normalizeSearchText(request.getColor()),
+                normalizeSearchText(request.getFaceSize()),
+                normalizeSearchText(request.getSpec()),
+                request.getStatus(),
+                pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Product> findAvailableProducts() {
+        return productRepository.findAvailableProducts();
     }
 
     @Transactional(readOnly = true)
@@ -115,86 +210,106 @@ public class ProductService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
-    public List<ProductResponse> findByStatus(ProductStatus status) {
-        return productRepository.findByStatus(status).stream()
-                .map(this::toProductResponse)
-                .toList();
-    }
-
-    public ProductResponse updateStock(String id, int quantity) {
+    public Product updateStock(String id, int quantity) {
+        accessControlService.requirePrivilegedRole();
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
-        product.setStockQuantity(product.getStockQuantity() + quantity);
-        return toProductResponse(productRepository.save(product));
+        int nextQuantity = product.getStockQuantity() + quantity;
+        if (nextQuantity < 0) {
+            throw new IllegalArgumentException("Stock quantity cannot be negative");
+        }
+        product.setStockQuantity(nextQuantity);
+        return productRepository.save(product);
     }
 
-    public ProductResponse uploadProductImages(String productId, List<MultipartFile> files, Integer thumbnailIndex) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
-
-        if (files == null || files.isEmpty()) {
-            throw new IllegalArgumentException("At least one image file is required");
+    private void validateProductRequest(Long price, Integer stockQuantity, String name, String brand) {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("Product name is required");
         }
-
-        List<MultipartFile> validFiles = files.stream()
-                .filter(file -> file != null && !file.isEmpty())
-                .toList();
-
-        if (validFiles.isEmpty()) {
-            throw new IllegalArgumentException("At least one non-empty image file is required");
+        if (brand == null || brand.isBlank()) {
+            throw new IllegalArgumentException("Brand is required");
         }
-
-        if (thumbnailIndex != null && (thumbnailIndex < 0 || thumbnailIndex >= validFiles.size())) {
-            throw new IllegalArgumentException("thumbnailIndex is out of range");
+        if (price == null || price <= 0) {
+            throw new IllegalArgumentException("Price must be greater than 0");
         }
-
-        if (thumbnailIndex != null) {
-            product.getImages().forEach(image -> image.setIsThumbnail(false));
+        if (stockQuantity == null || stockQuantity < 0) {
+            throw new IllegalArgumentException("Stock quantity must not be negative");
         }
-
-        List<ProductImage> newImages = new ArrayList<>();
-        for (int i = 0; i < validFiles.size(); i++) {
-            MultipartFile file = validFiles.get(i);
-            String imageUrl = cloudinaryService.uploadProductImage(file, product.getId());
-            boolean isThumbnail = thumbnailIndex != null && i == thumbnailIndex;
-
-            ProductImage image = ProductImage.builder()
-                    .product(product)
-                    .imageUrl(imageUrl)
-                    .altText(file.getOriginalFilename())
-                    .isThumbnail(isThumbnail)
-                    .build();
-            newImages.add(image);
-        }
-
-        product.getImages().addAll(newImages);
-
-        boolean hasThumbnail = product.getImages().stream()
-                .anyMatch(image -> Boolean.TRUE.equals(image.getIsThumbnail()));
-        if (!hasThumbnail && !product.getImages().isEmpty()) {
-            product.getImages().get(0).setIsThumbnail(true);
-        }
-
-        Product saved = productRepository.save(product);
-        return toProductResponse(saved);
     }
 
-    private void applyProductRequest(Product product, ProductRequest request, Category category) {
-        product.setBrand(request.getBrand());
-        product.setName(request.getName());
-        product.setDescription(request.getDescription());
-        product.setPrice(request.getPrice());
-        product.setStockQuantity(request.getStockQuantity());
+    private String normalizeSearchText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private String normalizeOptionalText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private ProductImageResponse mapProductImageResponse(ProductImage image) {
+        return ProductImageResponse.builder()
+                .id(image.getId())
+                .imageUrl(image.getImageUrl())
+                .altText(image.getAltText())
+                .isThumbnail(image.getIsThumbnail())
+                .build();
+    }
+
+    private void applyProductRequest(Product product, ProductCreateRequest request, Category category) {
+        applyProductFields(product, request.getBrand(), request.getName(), request.getDescription(), request.getPrice(),
+                request.getStockQuantity(), request.getMovementType(), request.getGlassMaterial(), request.getWaterResistance(),
+                request.getFaceSize(), request.getSize(), request.getWireMaterial(), request.getWireColor(), request.getCaseColor(),
+                request.getFaceColor(), request.getColor(), request.getSpecs(), category);
+    }
+
+    private void applyProductRequest(Product product, ProductUpdateRequest request, Category category) {
+        applyProductFields(product, request.getBrand(), request.getName(), request.getDescription(), request.getPrice(),
+                request.getStockQuantity(), request.getMovementType(), request.getGlassMaterial(), request.getWaterResistance(),
+                request.getFaceSize(), request.getSize(), request.getWireMaterial(), request.getWireColor(), request.getCaseColor(),
+                request.getFaceColor(), request.getColor(), request.getSpecs(), category);
+
+        if (request.getStatus() != null) {
+            product.setStatus(request.getStatus());
+        }
+    }
+
+    private void applyProductFields(Product product,
+                                    String brand,
+                                    String name,
+                                    String description,
+                                    Long price,
+                                    Integer stockQuantity,
+                                    String movementType,
+                                    String glassMaterial,
+                                    String waterResistance,
+                                    String faceSize,
+                                    String size,
+                                    String wireMaterial,
+                                    String wireColor,
+                                    String caseColor,
+                                    String faceColor,
+                                    String color,
+                                    String specs,
+                                    Category category) {
+        product.setBrand(brand);
+        product.setName(name);
+        product.setDescription(description != null ? description : specs);
+        product.setPrice(price);
+        product.setStockQuantity(stockQuantity);
         product.setCategory(category);
-        product.setMovementType(request.getMovementType());
-        product.setGlassMaterial(request.getGlassMaterial());
-        product.setWaterResistance(request.getWaterResistance());
-        product.setFaceSize(request.getFaceSize());
-        product.setWireMaterial(request.getWireMaterial());
-        product.setWireColor(request.getWireColor());
-        product.setCaseColor(request.getCaseColor());
-        product.setFaceColor(request.getFaceColor());
+        product.setMovementType(movementType);
+        product.setGlassMaterial(glassMaterial);
+        product.setWaterResistance(waterResistance);
+        product.setFaceSize(faceSize != null ? faceSize : size);
+        product.setWireMaterial(wireMaterial);
+        product.setWireColor(wireColor != null ? wireColor : color);
+        product.setCaseColor(caseColor != null ? caseColor : color);
+        product.setFaceColor(faceColor != null ? faceColor : color);
 
         if (product.getStatus() == null) {
             product.setStatus(ProductStatus.ACTIVE);

@@ -62,8 +62,8 @@ public class Product {
     @Column(name = "water_resistance", length = 100)
     private String waterResistance;
 
-    @Size(max = 50, message = "Face size must not exceed 50 characters")
-    @Column(name = "face_size", length = 50)
+    @Size(max = 100, message = "Face size must not exceed 100 characters")
+    @Column(name = "face_size", length = 100)
     private String faceSize;
 
     @Size(max = 100, message = "Wire material must not exceed 100 characters")
@@ -107,4 +107,9 @@ public class Product {
     @JsonIgnore
     @Builder.Default
     private List<Review> reviews = new ArrayList<>();
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
+    @Builder.Default
+    private List<Warranty> warranties = new ArrayList<>();
 }
