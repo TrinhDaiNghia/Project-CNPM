@@ -101,9 +101,9 @@ public class ReviewService {
                 .createdAt(review.getCreatedAt())
                 .customerId(review.getCustomer() != null ? review.getCustomer().getId() : null)
                 .customerUsername(
-                        review.getCustomer() != null && review.getCustomer().getUser() != null
-                                ? review.getCustomer().getUser().getUsername()
-                                : null
+                    review.getCustomer() != null
+                        ? review.getCustomer().getUsername()
+                        : null
                 )
                 .productId(review.getProduct() != null ? review.getProduct().getId() : null)
                 .productName(review.getProduct() != null ? review.getProduct().getName() : null)

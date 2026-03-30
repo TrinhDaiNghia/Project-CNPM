@@ -5,6 +5,7 @@ import com.example.demo.dtos.request.ProductSearchRequest;
 import com.example.demo.dtos.request.ProductUpdateRequest;
 import com.example.demo.dtos.response.ProductImageResponse;
 import com.example.demo.entities.Product;
+import com.example.demo.dtos.response.ProductResponse;
 import com.example.demo.services.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -57,12 +58,12 @@ public class ProductController {
     }
 
     @PostMapping({"", "/create"})
-    public ResponseEntity<Product> create(@Valid @RequestBody ProductCreateRequest request) {
+    public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductCreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProduct(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Product> update(@PathVariable String id, @Valid @RequestBody ProductUpdateRequest request) {
+    public ResponseEntity<ProductResponse> update(@PathVariable String id, @Valid @RequestBody ProductUpdateRequest request) {
         return ResponseEntity.ok(productService.updateProduct(id, request));
     }
 
@@ -85,15 +86,15 @@ public class ProductController {
         return ResponseEntity.ok(productService.getProductImages(productId));
     }
 
-    @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ProductImageResponse> uploadImage(
+        @PostMapping(value = "/{id}/images/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        public ResponseEntity<ProductImageResponse> uploadImage(
             @PathVariable("id") String productId,
             @RequestPart("file") MultipartFile file,
             @RequestParam(required = false) String altText,
             @RequestParam(required = false) Boolean isThumbnail) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(productService.uploadProductImage(productId, file, altText, isThumbnail));
-    }
+            .body(productService.uploadProductImage(productId, file, altText, isThumbnail));
+        }
 
     @DeleteMapping("/{id}/images/{imageId}")
     public ResponseEntity<Void> deleteImage(@PathVariable("id") String productId,
@@ -103,7 +104,7 @@ public class ProductController {
     }
     
     @GetMapping("/compare")
-    public ResponseEntity<List<Product>> compare(@RequestParam String productAId, @RequestParam String productBId) {
+    public ResponseEntity<List<ProductResponse>> compare(@RequestParam String productAId, @RequestParam String productBId) {
         return ResponseEntity.ok(productService.compareProducts(productAId, productBId));
     }
 }

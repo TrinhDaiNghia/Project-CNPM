@@ -8,8 +8,10 @@ import com.example.demo.dtos.request.VerifyEmailOtpRequest;
 import com.example.demo.dtos.response.AuthResponse;
 import com.example.demo.dtos.response.OtpResponse;
 import com.example.demo.entities.User;
+import com.example.demo.entities.Customer;
 import com.example.demo.entities.enums.UserRole;
 import com.example.demo.repositories.UserRepository;
+import com.example.demo.repositories.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final UserProfileService userProfileService;
     private final NotificationService notificationService;
+    private final CustomerRepository customerRepository;
     private final Map<String, PendingRegistration> pendingRegistrations = new ConcurrentHashMap<>();
 
     public OtpResponse register(RegisterRequest request) {
@@ -81,20 +84,17 @@ public class AuthService {
             throw new IllegalStateException("Username already exists");
         }
 
-        User user = User.builder()
-                .username(registerRequest.getUsername())
-                .password(registerRequest.getPassword())
-                .email(registerRequest.getEmail())
-                .phone(registerRequest.getPhone())
-                .address(registerRequest.getAddress())
-                .gender(registerRequest.getGender())
-                .role(UserRole.CUSTOMER)
-                .build();
-
-        User savedUser = userRepository.save(Objects.requireNonNull(user));
         Customer customer = new Customer();
-        customer.setId(savedUser.getId());
-        customerRepository.save(Objects.requireNonNull(customer));
+        customer.setUsername(registerRequest.getUsername());
+        customer.setPassword(registerRequest.getPassword());
+        customer.setFullName(registerRequest.getFullName());
+        customer.setEmail(registerRequest.getEmail());
+        customer.setPhone(registerRequest.getPhone());
+        customer.setAddress(registerRequest.getAddress());
+        customer.setGender(registerRequest.getGender());
+        customer.setRole(UserRole.CUSTOMER);
+
+        User savedUser = userRepository.save(Objects.requireNonNull(customer));
         pendingRegistrations.remove(emailKey);
         notificationService.sendRegistrationSuccessNotification(savedUser);
 
@@ -168,6 +168,7 @@ public class AuthService {
         RegisterRequest copy = new RegisterRequest();
         copy.setUsername(request.getUsername());
         copy.setPassword(request.getPassword());
+        copy.setFullName(request.getFullName());
         copy.setEmail(request.getEmail());
         copy.setPhone(request.getPhone());
         copy.setAddress(request.getAddress());

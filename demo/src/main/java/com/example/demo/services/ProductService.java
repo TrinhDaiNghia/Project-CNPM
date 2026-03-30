@@ -4,6 +4,7 @@ import com.example.demo.dtos.request.ProductCreateRequest;
 import com.example.demo.dtos.request.ProductSearchRequest;
 import com.example.demo.dtos.request.ProductUpdateRequest;
 import com.example.demo.dtos.response.ProductImageResponse;
+import com.example.demo.dtos.response.ProductResponse;
 import com.example.demo.entities.Category;
 import com.example.demo.entities.Product;
 import com.example.demo.entities.ProductImage;
@@ -22,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Map;
 import java.util.List;
 import java.util.Optional;
+import java.util.Comparator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -36,7 +38,7 @@ public class ProductService {
     private final AccessControlService accessControlService;
     private final CloudinaryService cloudinaryService;
 
-    public Product createProduct(ProductCreateRequest request) {
+    public ProductResponse createProduct(ProductCreateRequest request) {
         accessControlService.requirePrivilegedRole();
         validateProductRequest(request.getPrice(), request.getStockQuantity(), request.getName(), request.getBrand());
 
@@ -52,7 +54,7 @@ public class ProductService {
         return toProductResponse(productRepository.save(product));
     }
 
-    public Product updateProduct(String id, ProductUpdateRequest request) {
+    public ProductResponse updateProduct(String id, ProductUpdateRequest request) {
         accessControlService.requirePrivilegedRole();
         validateProductRequest(request.getPrice(), request.getStockQuantity(), request.getName(), request.getBrand());
 
@@ -111,47 +113,58 @@ public class ProductService {
         return mapProductImageResponse(saved);
     }
 
-    public void deleteProductImage(String productId, String imageId) {
+        public ProductResponse uploadProductImages(String productId,
+                               List<MultipartFile> files,
+                               Integer thumbnailIndex) {
+        accessControlService.requirePrivilegedRole();
+
+        Product product = productRepository.findById(productId)
+            .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+
+        if (thumbnailIndex != null && thumbnailIndex >= 0 && thumbnailIndex < files.size()) {
+            productImageRepository.clearThumbnailByProductId(productId);
+        }
+
+        for (int i = 0; i < files.size(); i++) {
+            MultipartFile file = files.get(i);
+            CloudinaryService.CloudinaryUploadResult uploaded = cloudinaryService.uploadProductImage(file, productId);
+
+            ProductImage image = ProductImage.builder()
+                .imageUrl(uploaded.imageUrl())
+                .publicId(uploaded.publicId())
+                .altText(null)
+                .isThumbnail(thumbnailIndex != null && thumbnailIndex == i)
+                .product(product)
+                .build();
+
+            productImageRepository.save(image);
+        }
+
+        Product updated = productRepository.findById(productId)
+            .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+        return toProductResponse(updated);
+        }
+
+        public void deleteProductImage(String productId, String imageId) {
         accessControlService.requirePrivilegedRole();
 
         ProductImage image = productImageRepository.findByIdAndProductId(imageId, productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Product image not found: " + imageId));
+            .orElseThrow(() -> new ResourceNotFoundException("Product image not found: " + imageId));
 
         cloudinaryService.deleteProductImage(image.getPublicId());
         productImageRepository.delete(image);
-    }
+        }
 
-    @Transactional(readOnly = true)
-    public List<ProductImageResponse> getProductImages(String productId) {
+        @Transactional(readOnly = true)
+        public List<ProductImageResponse> getProductImages(String productId) {
         productRepository.findById(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+            .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
 
         return productImageRepository.findByProductId(productId)
-                .stream()
-                .map(this::mapProductImageResponse)
-                .toList();
-    }
-
-    public List<Product> compareProducts(String productAId, String productBId) {
-        if (productAId == null || productAId.isBlank() || productBId == null || productBId.isBlank()) {
-            throw new IllegalArgumentException("Both product IDs are required");
+            .stream()
+            .map(this::mapProductImageResponse)
+            .toList();
         }
-
-        if (productAId.equals(productBId)) {
-            throw new IllegalArgumentException("Cannot compare the same product: " + productAId);
-        }
-
-        Map<String, Product> productsById = productRepository.findAllById(List.of(productAId, productBId))
-                .stream()
-                .collect(Collectors.toMap(Product::getId, Function.identity(), (left, right) -> left));
-
-        Product productA = Optional.ofNullable(productsById.get(productAId))
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productAId));
-        Product productB = Optional.ofNullable(productsById.get(productBId))
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productBId));
-
-        return List.of(productA, productB);
-    }
 
     public List<ProductResponse> compareProducts(String productAId, String productBId) {
         if (productAId == null || productAId.isBlank() || productBId == null || productBId.isBlank()) {
@@ -197,12 +210,6 @@ public class ProductService {
                 request.getStatus(),
                 pageable);
     }
-
-    @Transactional(readOnly = true)
-    public List<Product> findAvailableProducts() {
-        return productRepository.findAvailableProducts();
-    }
-
     @Transactional(readOnly = true)
     public List<ProductResponse> findAvailableProducts() {
         return productRepository.findAvailableProducts().stream()

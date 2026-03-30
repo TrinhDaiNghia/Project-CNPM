@@ -45,9 +45,8 @@ public class UserProfileService {
             return;
         }
 
-        Customer customer = Customer.builder()
-                .user(user)
-                .build();
+        Customer customer = new Customer();
+        customer.setId(user.getId());
         customerRepository.save(customer);
     }
 
@@ -56,9 +55,8 @@ public class UserProfileService {
             return;
         }
 
-        Owner owner = Owner.builder()
-                .user(user)
-                .build();
+        Owner owner = new Owner();
+        owner.setId(user.getId());
         ownerRepository.save(owner);
     }
 
