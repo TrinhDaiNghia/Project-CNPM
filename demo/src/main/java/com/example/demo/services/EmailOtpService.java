@@ -101,10 +101,21 @@ public class EmailOtpService {
         message.setText("Your OTP code is: " + otp + "\nThis code will expire in 10 minutes.");
 
         try {
-            mailSender.send(message);
-        } catch (MailException ex) {
-            log.error("Failed to send OTP email to {}", email, ex);
-            throw new IllegalStateException("Failed to send OTP email");
+            // Log OTP for development/debugging so it can be verified without email delivery
+            log.info("Generated OTP for {}: {}", email, otp);
+
+            // Send email asynchronously to avoid blocking the registration request
+            new Thread(() -> {
+                try {
+                    mailSender.send(message);
+                    log.info("OTP email sent to {}", email);
+                } catch (MailException ex) {
+                    log.error("Failed to send OTP email to {}", email, ex);
+                }
+            }, "otp-email-sender").start();
+        } catch (Exception ex) {
+            // Ensure that email delivery problems do not break registration flow
+            log.error("Failed to schedule OTP email to {}", email, ex);
         }
     }
 

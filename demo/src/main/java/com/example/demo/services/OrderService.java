@@ -82,6 +82,7 @@ public class OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
         order.setStatus(status);
+        
         return orderRepository.save(order);
     }
 
