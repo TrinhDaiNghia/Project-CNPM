@@ -43,4 +43,12 @@ public class ProductImage {
     @JoinColumn(name = "product_id", nullable = false)
     @JsonIgnore
     private Product product;
+
+    public String getUrl() {
+        return imageUrl;
+    }
+
+    public void setUrl(String url) {
+        this.imageUrl = url;
+    }
 }

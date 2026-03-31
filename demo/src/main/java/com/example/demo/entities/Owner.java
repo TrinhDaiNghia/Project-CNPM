@@ -36,5 +36,13 @@ public class Owner {
 
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
-    private List<ReviewReport> reviewReports = new ArrayList<>();
+    private List<RevenueReport> revenueReports = new ArrayList<>();
+
+    public List<RevenueReport> getReviewReports() {
+        return revenueReports;
+    }
+
+    public void setReviewReports(List<RevenueReport> reviewReports) {
+        this.revenueReports = reviewReports;
+    }
 }

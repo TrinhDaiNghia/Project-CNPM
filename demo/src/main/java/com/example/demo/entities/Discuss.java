@@ -39,9 +39,21 @@ public class Discuss {
     @Column(name = "content_log", columnDefinition = "TEXT")
     private String contentLog;
 
+    @Column(name = "is_ai_handled", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Builder.Default
+    private Boolean isAiHandled = false;
+
     @NotNull(message = "Customer is required")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_id", nullable = false)
     @JsonIgnore
     private Customer customer;
+
+    public Date getStartTime() {
+        return startDate;
+    }
+
+    public void setStartTime(Date startTime) {
+        this.startDate = startTime;
+    }
 }

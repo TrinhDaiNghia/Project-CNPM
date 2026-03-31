@@ -50,6 +50,7 @@ public class SystemBotInitializer implements ApplicationRunner {
             User newBot = User.builder()
                     .username(normalizedUsername)
                     .password(passwordEncoder.encode(normalize(botPassword)))
+                    .fullName("System Bot")
                     .email(normalizedEmail)
                     .address("SYSTEM")
                     .role(UserRole.STAFF)
@@ -61,6 +62,10 @@ public class SystemBotInitializer implements ApplicationRunner {
         boolean changed = false;
         if (!StringUtils.hasText(bot.getAddress())) {
             bot.setAddress("SYSTEM");
+            changed = true;
+        }
+        if (!StringUtils.hasText(bot.getFullName())) {
+            bot.setFullName("System Bot");
             changed = true;
         }
         if (bot.getRole() != UserRole.STAFF && bot.getRole() != UserRole.OWNER) {

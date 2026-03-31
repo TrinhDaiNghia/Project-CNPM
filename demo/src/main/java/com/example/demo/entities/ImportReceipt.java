@@ -46,4 +46,19 @@ public class ImportReceipt {
     @OneToMany(mappedBy = "importReceipt", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @Builder.Default
     private List<ImportDetail> importDetails = new ArrayList<>();
+
+    @Transient
+    public Long getTotalCost() {
+        if (importDetails == null || importDetails.isEmpty()) {
+            return 0L;
+        }
+
+        long total = 0L;
+        for (ImportDetail detail : importDetails) {
+            if (detail.getImportPrice() != null && detail.getQuantity() != null) {
+                total += detail.getImportPrice() * detail.getQuantity();
+            }
+        }
+        return total;
+    }
 }

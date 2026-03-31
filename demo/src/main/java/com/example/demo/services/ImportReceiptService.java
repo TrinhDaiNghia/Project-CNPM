@@ -148,6 +148,7 @@ public class ImportReceiptService {
                 .ownerId(receipt.getOwner().getId())
                 .items(items)
                 .totalAmount(totalAmount)
+                .totalCost(totalAmount)
                 .build();
     }
 

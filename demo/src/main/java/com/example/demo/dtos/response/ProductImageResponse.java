@@ -9,6 +9,7 @@ public class ProductImageResponse {
 
     private String id;
     private String imageUrl;
+    private String url;
     private String altText;
     private Boolean isThumbnail;
 }

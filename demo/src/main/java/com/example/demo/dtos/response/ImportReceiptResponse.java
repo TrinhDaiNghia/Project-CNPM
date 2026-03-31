@@ -18,4 +18,5 @@ public class ImportReceiptResponse {
     private String ownerId;
     private List<ImportReceiptItemResponse> items;
     private Long totalAmount;
+    private Long totalCost;
 }
