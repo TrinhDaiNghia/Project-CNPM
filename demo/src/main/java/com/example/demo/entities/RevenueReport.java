@@ -15,7 +15,7 @@ import java.util.Date;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ReviewReport {
+public class RevenueReport {
 
     @Id
     @UuidGenerator
@@ -50,4 +50,20 @@ public class ReviewReport {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false)
     private Owner owner;
+
+    public Double getTotalRevenue() {
+        return totalSales;
+    }
+
+    public void setTotalRevenue(Double totalRevenue) {
+        this.totalSales = totalRevenue;
+    }
+
+    public Double getRevenueScore() {
+        return scoreSales;
+    }
+
+    public void setRevenueScore(Double revenueScore) {
+        this.scoreSales = revenueScore;
+    }
 }

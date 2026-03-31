@@ -2,8 +2,8 @@
 
 ## 1) Tong quan
 - Base path: /api
-- Tong so endpoint hien co: 45
-- Nhom chuc nang: Auth, Users, Categories, Products, Cart, Orders, Reviews, Vouchers
+- Tong so endpoint hien co: 59
+- Nhom chuc nang: Auth, Users, Categories, Products, Cart, Orders, Reviews, Vouchers, Suppliers, Warranties, Import Receipts, Reports
 
 ## 2) Danh sach API chi tiet
 
@@ -39,11 +39,15 @@
 | Method | Endpoint | Mo ta |
 |---|---|---|
 | GET | /api/products | Lay danh sach san pham con kinh doanh |
-| GET | /api/products/search?name={name}&page={p}&size={s} | Tim san pham theo ten (phan trang) |
+| GET | /api/products/search?name={name}&brand={brand}&color={color}&faceSize={faceSize}&spec={spec}&status={status}&page={p}&size={s} | Tim kiem san pham theo bo loc (phan trang, `size` la page size) |
 | GET | /api/products/{id} | Lay san pham theo id |
+| GET | /api/products/{id}/images | Lay danh sach anh cua san pham |
 | GET | /api/products/category/{categoryId} | Lay san pham theo category |
 | POST | /api/products | Tao san pham |
+| POST | /api/products/{id}/images (multipart/form-data) | Upload anh cho san pham |
+| POST | /api/products/create | Tao san pham |
 | PUT | /api/products/{id} | Cap nhat san pham |
+| DELETE | /api/products/{id}/images/{imageId} | Xoa anh cua san pham |
 | DELETE | /api/products/{id} | Xoa san pham |
 
 ### Cart (/api/cart)
@@ -64,7 +68,7 @@
 | PATCH | /api/orders/{id}/status?status={OrderStatus} | Cap nhat trang thai don (khong nhan CANCELLED) |
 | PATCH | /api/orders/{id}/cancel | Huy don |
 
-OrderStatus: PENDING, CONFIRMED, DELIVERED, COMPLETED, CANCELLED, RETURNED
+OrderStatus: PENDING, CONFIRMED, SHIPPING, DELIVERED, COMPLETED, CANCELLED, RETURNED
 
 ### Reviews (/api/reviews)
 | Method | Endpoint | Mo ta |
@@ -87,6 +91,37 @@ OrderStatus: PENDING, CONFIRMED, DELIVERED, COMPLETED, CANCELLED, RETURNED
 | POST | /api/vouchers/apply/{code} | Ap dung voucher theo code |
 | DELETE | /api/vouchers/{id} | Xoa voucher |
 
+### Suppliers (/api/suppliers)
+| Method | Endpoint | Mo ta |
+|---|---|---|
+| GET | /api/suppliers?keyword={kw} | Lay/tim danh sach nha cung cap |
+| GET | /api/suppliers/{id} | Lay nha cung cap theo id |
+| POST | /api/suppliers | Tao nha cung cap |
+| PUT | /api/suppliers/{id} | Cap nhat nha cung cap |
+| DELETE | /api/suppliers/{id} | Xoa nha cung cap (chan xoa neu da phat sinh import receipt) |
+
+### Warranties (/api/warranties)
+| Method | Endpoint | Mo ta |
+|---|---|---|
+| GET | /api/warranties?customerId={id}&status={status} | Lay danh sach yeu cau bao hanh (theo customer/status) |
+| GET | /api/warranties/{id} | Lay chi tiet 1 yeu cau bao hanh |
+| POST | /api/warranties | Customer tao yeu cau bao hanh |
+| PATCH | /api/warranties/{id}/status | Staff/Owner duyet/tu choi yeu cau bao hanh |
+
+WarrantyStatus: PENDING, APPROVED, REJECTED
+
+### Import Receipts (/api/import-receipts)
+| Method | Endpoint | Mo ta |
+|---|---|---|
+| GET | /api/import-receipts?supplierId={id}&fromDate=yyyy-MM-dd&toDate=yyyy-MM-dd&keyword={kw} | Lay/loc danh sach phieu nhap |
+| GET | /api/import-receipts/{id} | Lay chi tiet phieu nhap |
+| POST | /api/import-receipts | Tao phieu nhap va cap nhat ton kho san pham |
+
+### Reports (/api/reports)
+| Method | Endpoint | Mo ta |
+|---|---|---|
+| GET | /api/reports/summary?fromDate=yyyy-MM-dd&toDate=yyyy-MM-dd | Bao cao tong hop (doanh thu, don hang, top san pham, khach hang moi) |
+
 ## 3) Flow tong the de mua hang
 
 1. Khach hang dang ky/dang nhap tai khoan
@@ -96,7 +131,7 @@ OrderStatus: PENDING, CONFIRMED, DELIVERED, COMPLETED, CANCELLED, RETURNED
 
 2. Quan tri vien tao danh muc va san pham
 - POST /api/categories
-- POST /api/products
+- POST /api/products/create
 
 3. Khach hang duyet san pham
 - GET /api/products
@@ -126,6 +161,22 @@ OrderStatus: PENDING, CONFIRMED, DELIVERED, COMPLETED, CANCELLED, RETURNED
 - GET /api/reviews/product/{productId}
 - GET /api/reviews/product/{productId}/average-rating
 
+9. Khach gui yeu cau bao hanh sau mua hang
+- POST /api/warranties
+- GET /api/warranties?customerId={customerId}
+
+10. Staff/Owner xu ly bao hanh
+- GET /api/warranties?status=PENDING
+- PATCH /api/warranties/{id}/status
+
+11. Owner quan ly nha cung cap va nhap hang
+- GET/POST/PUT/DELETE /api/suppliers
+- POST /api/import-receipts
+- GET /api/import-receipts
+
+12. Owner xem bao cao dashboard
+- GET /api/reports/summary
+
 ## 4) So do Flow (Mermaid)
 
 ```mermaid
@@ -143,7 +194,13 @@ flowchart TD
     J --> K[Staff/Owner cap nhat status]
     K --> L[DELIVERED/COMPLETED]
     L --> M[Customer tao review]
+    L --> O[Customer tao warranty request]
+    O --> P[Staff/Owner approve/reject warranty]
     M --> N[Cap nhat average rating product]
+    A --> Q[Owner quan ly supplier]
+    Q --> R[Owner tao import receipt]
+    R --> S[Cap nhat ton kho san pham]
+    S --> T[Owner xem report summary]
 ```
 
 ## 5) Mau loi API

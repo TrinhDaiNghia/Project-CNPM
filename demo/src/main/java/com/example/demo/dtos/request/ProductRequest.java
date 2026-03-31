@@ -27,15 +27,27 @@ public class ProductRequest {
     @NotBlank(message = "Category ID is required")
     private String categoryId;
 
+    @Size(max = 100)
+    private String movementType;
+
+    @Size(max = 100)
+    private String glassMaterial;
+
+    @Size(max = 100)
+    private String waterResistance;
+
     @Size(max = 50)
-    private String partNumber;
+    private String faceSize;
 
     @Size(max = 100)
-    private String powerSource;
+    private String wireMaterial;
 
     @Size(max = 100)
-    private String license;
+    private String wireColor;
 
-    @Size(max = 200)
-    private String warranty;
+    @Size(max = 100)
+    private String caseColor;
+
+    @Size(max = 100)
+    private String faceColor;
 }

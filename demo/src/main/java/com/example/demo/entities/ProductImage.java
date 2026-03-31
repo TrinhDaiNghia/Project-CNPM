@@ -1,5 +1,6 @@
 package com.example.demo.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -24,6 +25,11 @@ public class ProductImage {
     @Column(name = "image_url", nullable = false, length = 500)
     private String imageUrl;
 
+    @NotBlank(message = "Cloudinary public id is required")
+    @Size(max = 255, message = "Public id must not exceed 255 characters")
+    @Column(name = "public_id", nullable = false, length = 255, unique = true)
+    private String publicId;
+
     @Size(max = 255, message = "Alt text must not exceed 255 characters")
     @Column(name = "alt_text", length = 255)
     private String altText;
@@ -35,5 +41,14 @@ public class ProductImage {
     @NotNull(message = "Product is required")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
+    @JsonIgnore
     private Product product;
+
+    public String getUrl() {
+        return imageUrl;
+    }
+
+    public void setUrl(String url) {
+        this.imageUrl = url;
+    }
 }

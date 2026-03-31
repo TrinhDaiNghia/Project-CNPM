@@ -1,6 +1,7 @@
 package com.example.demo.entities;
 
 import com.example.demo.entities.enums.OrderStatus;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -39,6 +40,10 @@ public class Order {
     @Column(name = "note", length = 500)
     private String note;
 
+    @Size(max = 255, message = "Shipping address must not exceed 255 characters")
+    @Column(name = "shipping_address", length = 255)
+    private String shippingAddress;
+
     @NotNull(message = "Order status is required")
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -55,9 +60,11 @@ public class Order {
     private Voucher voucher;
 
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private Payment payment;
 
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private Shipping shipping;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)

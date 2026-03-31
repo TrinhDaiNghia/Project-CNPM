@@ -20,6 +20,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AccessControlService accessControlService;
+    private final UserProfileService userProfileService;
 
     public User createUser(User user) {
         accessControlService.requireOwnerRole();
@@ -39,7 +40,9 @@ public class UserService {
             throw new IllegalStateException("Email already exists");
         }
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+        userProfileService.syncProfileForRole(savedUser);
+        return savedUser;
     }
 
     public User updateUser(String id, User user) {
@@ -62,6 +65,7 @@ public class UserService {
 
         // Password updates are intentionally handled by auth flow (OTP/reset-password).
         existing.setUsername(user.getUsername());
+        existing.setFullName(user.getFullName());
         existing.setEmail(user.getEmail());
         existing.setPhone(user.getPhone());
         existing.setAddress(user.getAddress());
@@ -74,7 +78,9 @@ public class UserService {
             throw new org.springframework.security.access.AccessDeniedException("Only OWNER can change user role");
         }
 
-        return userRepository.save(existing);
+        User updatedUser = userRepository.save(existing);
+        userProfileService.syncProfileForRole(updatedUser);
+        return updatedUser;
     }
 
     public void deleteUser(String id) {

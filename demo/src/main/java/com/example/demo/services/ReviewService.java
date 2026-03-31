@@ -1,6 +1,7 @@
 package com.example.demo.services;
 
 import com.example.demo.dtos.request.ReviewRequest;
+import com.example.demo.dtos.response.ReviewResponse;
 import com.example.demo.entities.Customer;
 import com.example.demo.entities.Product;
 import com.example.demo.entities.Review;
@@ -25,7 +26,7 @@ public class ReviewService {
     private final ProductRepository productRepository;
     private final AccessControlService accessControlService;
 
-    public Review createReview(ReviewRequest request) {
+    public ReviewResponse createReview(ReviewRequest request) {
         accessControlService.requireCustomerAccess(request.getCustomerId());
         if (reviewRepository.existsByCustomerIdAndProductId(request.getCustomerId(), request.getProductId())) {
             throw new IllegalStateException("Review already exists for this customer and product");
@@ -41,10 +42,10 @@ public class ReviewService {
         review.setProduct(product);
         review.setRating(request.getRating());
         review.setComment(request.getComment());
-        return reviewRepository.save(review);
+        return toResponse(reviewRepository.save(review));
     }
 
-    public Review updateReview(String id, ReviewRequest request) {
+    public ReviewResponse updateReview(String id, ReviewRequest request) {
         Review existing = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Review not found: " + id));
         accessControlService.requireCustomerAccess(existing.getCustomer().getId());
@@ -56,7 +57,7 @@ public class ReviewService {
 
         existing.setRating(request.getRating());
         existing.setComment(request.getComment());
-        return reviewRepository.save(existing);
+        return toResponse(reviewRepository.save(existing));
     }
 
     public void deleteReview(String id) {
@@ -67,27 +68,45 @@ public class ReviewService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<Review> findById(String id) {
+    public Optional<ReviewResponse> findById(String id) {
         return reviewRepository.findById(id)
                 .map(review -> {
                     accessControlService.requireCustomerAccess(review.getCustomer().getId());
-                    return review;
+                    return toResponse(review);
                 });
     }
 
     @Transactional(readOnly = true)
-    public List<Review> findByProductId(String productId) {
-        return reviewRepository.findByProductId(productId);
+    public List<ReviewResponse> findByProductId(String productId) {
+        return reviewRepository.findByProductId(productId).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
-    public List<Review> findByCustomerId(String customerId) {
+    public List<ReviewResponse> findByCustomerId(String customerId) {
         accessControlService.requireCustomerAccess(customerId);
-        return reviewRepository.findByCustomerId(customerId);
+        return reviewRepository.findByCustomerId(customerId).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public Double getAverageRating(String productId) {
-        return reviewRepository.findAverageRatingByProductId(productId);
+        Double avg = reviewRepository.findAverageRatingByProductId(productId);
+        return avg != null ? avg : 0.0;
+    }
+
+    private ReviewResponse toResponse(Review review) {
+        return ReviewResponse.builder()
+                .id(review.getId())
+                .rating(review.getRating())
+                .comment(review.getComment())
+                .createdAt(review.getCreatedAt())
+                .customerId(review.getCustomer() != null ? review.getCustomer().getId() : null)
+                .customerUsername(
+                    review.getCustomer() != null
+                        ? review.getCustomer().getUsername()
+                        : null
+                )
+                .productId(review.getProduct() != null ? review.getProduct().getId() : null)
+                .productName(review.getProduct() != null ? review.getProduct().getName() : null)
+                .build();
     }
 }

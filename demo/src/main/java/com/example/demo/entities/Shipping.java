@@ -1,5 +1,6 @@
 package com.example.demo.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -44,5 +45,14 @@ public class Shipping {
     @NotNull(message = "Order is required")
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false, unique = true)
+    @JsonIgnore
     private Order order;
+
+    public String getTrackingCode() {
+        return trackingNumber;
+    }
+
+    public void setTrackingCode(String trackingCode) {
+        this.trackingNumber = trackingCode;
+    }
 }

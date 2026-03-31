@@ -1,6 +1,7 @@
 package com.example.demo.entities;
 
 import com.example.demo.entities.enums.ProductStatus;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -49,34 +50,37 @@ public class Product {
     @Builder.Default
     private Integer stockQuantity = 0;
 
-    @Min(value = 0, message = "Movement quantity must not be negative")
-    @Column(name = "movement_qty")
-    @Builder.Default
-    private Integer movementQty = 0;
+    @Size(max = 100, message = "Movement type must not exceed 100 characters")
+    @Column(name = "movement_type", length = 100)
+    private String movementType;
 
-    @Size(max = 50, message = "Part number must not exceed 50 characters")
-    @Column(name = "part_number", length = 50)
-    private String partNumber;
+    @Size(max = 100, message = "Glass material must not exceed 100 characters")
+    @Column(name = "glass_material", length = 100)
+    private String glassMaterial;
 
-    @Size(max = 100, message = "Power source must not exceed 100 characters")
-    @Column(name = "power_source", length = 100)
-    private String powerSource;
+    @Size(max = 100, message = "Water resistance must not exceed 100 characters")
+    @Column(name = "water_resistance", length = 100)
+    private String waterResistance;
 
-    @Size(max = 100, message = "License must not exceed 100 characters")
-    @Column(name = "license", length = 100)
-    private String license;
+    @Size(max = 100, message = "Face size must not exceed 100 characters")
+    @Column(name = "face_size", length = 100)
+    private String faceSize;
 
-    @Size(max = 200, message = "Warranty must not exceed 200 characters")
-    @Column(name = "warranty", length = 200)
-    private String warranty;
+    @Size(max = 100, message = "Wire material must not exceed 100 characters")
+    @Column(name = "wire_material", length = 100)
+    private String wireMaterial;
 
-    @Min(value = 0, message = "Unit cost must not be negative")
-    @Column(name = "unit_cost")
-    private Long unitCost;
+    @Size(max = 100, message = "Wire color must not exceed 100 characters")
+    @Column(name = "wire_color", length = 100)
+    private String wireColor;
 
-    @Temporal(TemporalType.DATE)
-    @Column(name = "test_date")
-    private Date testDate;
+    @Size(max = 100, message = "Case color must not exceed 100 characters")
+    @Column(name = "case_color", length = 100)
+    private String caseColor;
+
+    @Size(max = 100, message = "Face color must not exceed 100 characters")
+    @Column(name = "face_color", length = 100)
+    private String faceColor;
 
     @NotNull(message = "Product status is required")
     @Enumerated(EnumType.STRING)
@@ -95,10 +99,17 @@ public class Product {
     private Category category;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     @Builder.Default
     private List<ProductImage> images = new ArrayList<>();
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     @Builder.Default
     private List<Review> reviews = new ArrayList<>();
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
+    @Builder.Default
+    private List<Warranty> warranties = new ArrayList<>();
 }

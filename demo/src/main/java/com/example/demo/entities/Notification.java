@@ -1,5 +1,6 @@
 package com.example.demo.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -31,6 +32,10 @@ public class Notification {
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Size(max = 500, message = "Direct URL must not exceed 500 characters")
+    @Column(name = "direct_url", length = 500)
+    private String directUrl;
+
     @CreationTimestamp
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "time_created", updatable = false)
@@ -43,10 +48,12 @@ public class Notification {
     @NotNull(message = "Sender is required")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sender_id", nullable = false)
+    @JsonIgnore
     private User sender;
 
     @NotNull(message = "Receiver is required")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "receiver_id", nullable = false)
+    @JsonIgnore
     private User receiver;
 }

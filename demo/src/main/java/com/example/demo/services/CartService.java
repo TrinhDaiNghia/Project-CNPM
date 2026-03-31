@@ -100,8 +100,3 @@ public class CartService {
         cart.setTotalAmount(total);
     }
 }
-
-
-
-
-
