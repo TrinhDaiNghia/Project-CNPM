@@ -36,6 +36,10 @@ public class Notification {
     @Column(name = "direct_url", length = 500)
     private String directUrl;
 
+    @Builder.Default
+    @Column(name = "is_read", nullable = false)
+    private boolean read = false;
+
     @CreationTimestamp
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "time_created", updatable = false)

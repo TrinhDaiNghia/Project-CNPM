@@ -4,6 +4,7 @@ import com.example.demo.dtos.response.NotificationResponse;
 import com.example.demo.entities.Notification;
 import com.example.demo.entities.User;
 import com.example.demo.entities.enums.UserRole;
+import com.example.demo.exceptions.ResourceNotFoundException;
 import com.example.demo.repositories.NotificationRepository;
 import com.example.demo.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -242,12 +243,46 @@ public class NotificationService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<NotificationResponse> getNotificationsByUserId(String userId) {
+        return getMyNotifications(userId);
+    }
+
+    public void markAsRead(String userId, String notificationId) {
+        if (!StringUtils.hasText(userId)) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        if (!StringUtils.hasText(notificationId)) {
+            throw new IllegalArgumentException("notificationId is required");
+        }
+
+        accessControlService.requireUserSelfOrPrivileged(userId);
+
+        Notification notification = notificationRepository.findByIdAndReceiverId(notificationId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found: " + notificationId));
+
+        if (!notification.isRead()) {
+            notification.setRead(true);
+            notificationRepository.save(notification);
+        }
+    }
+
+    public int markAllAsRead(String userId) {
+        if (!StringUtils.hasText(userId)) {
+            throw new IllegalArgumentException("userId is required");
+        }
+
+        accessControlService.requireUserSelfOrPrivileged(userId);
+        return notificationRepository.markAllAsReadByReceiverId(userId);
+    }
+
     private NotificationResponse toResponse(Notification notification) {
         return NotificationResponse.builder()
                 .id(notification.getId())
                 .title(notification.getTitle())
                 .content(notification.getContent())
                 .directUrl(notification.getDirectUrl())
+                .isRead(notification.isRead())
                 .timeCreated(notification.getTimeCreated())
                 .expiry(notification.getExpiry())
                 .senderId(notification.getSender() != null ? notification.getSender().getId() : null)
