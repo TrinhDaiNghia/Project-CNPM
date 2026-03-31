@@ -13,6 +13,7 @@ public class NotificationResponse {
     private String title;
     private String content;
     private String directUrl;
+    private boolean isRead;
     private Date timeCreated;
     private Date expiry;
     private String senderId;
