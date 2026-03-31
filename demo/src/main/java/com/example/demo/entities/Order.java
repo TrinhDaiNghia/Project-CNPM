@@ -40,6 +40,10 @@ public class Order {
     @Column(name = "note", length = 500)
     private String note;
 
+    @Size(max = 255, message = "Shipping address must not exceed 255 characters")
+    @Column(name = "shipping_address", length = 255)
+    private String shippingAddress;
+
     @NotNull(message = "Order status is required")
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)

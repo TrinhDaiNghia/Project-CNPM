@@ -41,6 +41,7 @@ public class OrderService {
         Order order = Order.builder()
                 .customer(customer)
                 .note(request.getNote())
+                .shippingAddress(request.getShippingAddress())
                 .build();
 
         // Build order items

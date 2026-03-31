@@ -15,6 +15,7 @@ public class OrderResponse {
     private Date orderDate;
     private Long totalAmount;
     private String note;
+    private String shippingAddress;
     private OrderStatus status;
     private String customerId;
     private String customerUsername;

@@ -262,6 +262,7 @@ public class ProductService {
         return ProductImageResponse.builder()
                 .id(image.getId())
                 .imageUrl(image.getImageUrl())
+                .url(image.getImageUrl())
                 .altText(image.getAltText())
                 .isThumbnail(image.getIsThumbnail())
                 .build();

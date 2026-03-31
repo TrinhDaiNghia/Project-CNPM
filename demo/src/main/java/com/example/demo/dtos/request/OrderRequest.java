@@ -15,6 +15,9 @@ public class OrderRequest {
     @Size(max = 500, message = "Note must not exceed 500 characters")
     private String note;
 
+    @Size(max = 255, message = "Shipping address must not exceed 255 characters")
+    private String shippingAddress;
+
     private String voucherCode;
 
     @NotEmpty(message = "Order must have at least one item")

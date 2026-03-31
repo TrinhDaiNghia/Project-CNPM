@@ -12,6 +12,7 @@ public class NotificationResponse {
     private String id;
     private String title;
     private String content;
+    private String directUrl;
     private Date timeCreated;
     private Date expiry;
     private String senderId;
