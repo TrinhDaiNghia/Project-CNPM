@@ -103,7 +103,11 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public Optional<AuthResponse> login(LoginRequest request) {
-        Optional<User> optionalUser = userRepository.findByEmail(request.getEmail());
+        String identifier = normalizeLoginIdentifier(request.getUsernameOrEmail());
+        Optional<User> optionalUser = userRepository.findByUsername(identifier);
+        if (optionalUser.isEmpty()) {
+            optionalUser = userRepository.findByEmail(normalizeEmail(identifier));
+        }
         if (optionalUser.isEmpty()) {
             return Optional.empty();
         }
@@ -162,6 +166,10 @@ public class AuthService {
 
     private String normalizeEmail(String email) {
         return email == null ? "" : email.trim().toLowerCase();
+    }
+
+    private String normalizeLoginIdentifier(String identifier) {
+        return identifier == null ? "" : identifier.trim();
     }
 
     private RegisterRequest copyRegisterRequest(RegisterRequest request) {
