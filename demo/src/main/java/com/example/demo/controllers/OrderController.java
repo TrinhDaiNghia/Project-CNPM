@@ -2,7 +2,6 @@ package com.example.demo.controllers;
 
 import com.example.demo.dtos.request.OrderRequest;
 import com.example.demo.dtos.response.OrderResponse;
-import com.example.demo.entities.Order;
 import com.example.demo.entities.enums.OrderStatus;
 import com.example.demo.services.OrderService;
 import jakarta.validation.Valid;
@@ -54,9 +53,8 @@ public class OrderController {
     }
 
     @PatchMapping("/{id}/cancel")
-    public ResponseEntity<Void> cancel(@PathVariable String id) {
-        orderService.cancelOrder(id);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<OrderResponse> cancel(@PathVariable String id) {
+        return ResponseEntity.ok(orderService.cancelOrder(id));
     }
 }
 

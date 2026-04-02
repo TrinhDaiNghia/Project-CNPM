@@ -24,4 +24,5 @@ public class OrderResponse {
     private String customerAddress;
     private String voucherCode;
     private List<OrderItemResponse> orderItems;
+    private List<OrderStatusHistoryResponse> timeline;
 }
