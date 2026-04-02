@@ -200,7 +200,7 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public Page<Product> searchProducts(ProductSearchRequest request, Pageable pageable) {
+    public Page<ProductResponse> searchProducts(ProductSearchRequest request, Pageable pageable) {
         return productRepository.searchProducts(
                 normalizeSearchText(request.getName()),
                 normalizeSearchText(request.getBrand()),
@@ -208,7 +208,8 @@ public class ProductService {
                 normalizeSearchText(request.getFaceSize()),
                 normalizeSearchText(request.getSpec()),
                 request.getStatus(),
-                pageable);
+                pageable)
+                .map(this::toProductResponse);
     }
     @Transactional(readOnly = true)
     public List<ProductResponse> findAvailableProducts() {

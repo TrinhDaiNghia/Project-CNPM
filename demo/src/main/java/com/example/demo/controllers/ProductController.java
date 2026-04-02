@@ -4,7 +4,6 @@ import com.example.demo.dtos.request.ProductCreateRequest;
 import com.example.demo.dtos.request.ProductSearchRequest;
 import com.example.demo.dtos.request.ProductUpdateRequest;
 import com.example.demo.dtos.response.ProductImageResponse;
-import com.example.demo.entities.Product;
 import com.example.demo.dtos.response.ProductResponse;
 import com.example.demo.services.ProductService;
 import jakarta.validation.Valid;
@@ -35,7 +34,7 @@ public class ProductController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<Page<Product>> search(
+    public ResponseEntity<Page<ProductResponse>> search(
             @Valid @ModelAttribute ProductSearchRequest request,
             @RequestParam(required = false) String specs,
             @PageableDefault(size = 10) Pageable pageable) {
