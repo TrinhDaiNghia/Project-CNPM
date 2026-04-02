@@ -25,9 +25,5 @@ public class StaffUpdateRequest {
     private String address;
 
     private UserGender gender;
-
-    @NotBlank(message = "Staff code is required")
-    @Size(max = 30)
-    private String staffId;
 }
 

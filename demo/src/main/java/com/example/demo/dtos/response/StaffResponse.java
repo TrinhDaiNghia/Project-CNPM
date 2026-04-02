@@ -19,8 +19,6 @@ public class StaffResponse {
     private String address;
     private UserGender gender;
     private UserRole role;
-    private String staffId;
-    private Date joinDate;
     private Date createdAt;
 }
 

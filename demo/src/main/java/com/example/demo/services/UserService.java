@@ -83,6 +83,14 @@ public class UserService {
         return updatedUser;
     }
 
+    public User lockStaff(String id) {
+        return updateStaffActiveStatus(id, false);
+    }
+
+    public User unlockStaff(String id) {
+        return updateStaffActiveStatus(id, true);
+    }
+
     public void deleteUser(String id) {
         accessControlService.requireOwnerRole();
         userRepository.deleteById(id);
@@ -108,7 +116,7 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public List<User> findAllByRole(UserRole role) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
         return userRepository.findByRole(role);
     }
 
@@ -128,6 +136,20 @@ public class UserService {
     public boolean existsByEmail(String email) {
         accessControlService.requirePrivilegedRole();
         return userRepository.existsByEmail(email);
+    }
+
+    private User updateStaffActiveStatus(String userId, boolean isActive) {
+        accessControlService.requireOwnerRole();
+
+        User existing = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+
+        if (existing.getRole() != UserRole.STAFF) {
+            throw new IllegalStateException("Only STAFF accounts can be locked/unlocked from staff management");
+        }
+
+        existing.setIsActive(isActive);
+        return userRepository.save(existing);
     }
 }
 

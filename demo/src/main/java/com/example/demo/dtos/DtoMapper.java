@@ -36,8 +36,6 @@ public final class DtoMapper {
                 .address(staff.getAddress())
                 .gender(staff.getGender())
                 .role(staff.getRole())
-                .staffId(staff.getStaffId())
-                .joinDate(staff.getJoinDate())
                 .createdAt(staff.getCreatedAt())
                 .build();
     }

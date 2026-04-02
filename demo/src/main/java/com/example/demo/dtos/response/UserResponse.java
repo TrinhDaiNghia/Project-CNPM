@@ -19,6 +19,7 @@ public class UserResponse {
     private String address;
     private UserGender gender;
     private UserRole role;
+    private Boolean isActive;
     private Date createdAt;
 }
 

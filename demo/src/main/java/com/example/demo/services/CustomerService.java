@@ -95,6 +95,17 @@ public class CustomerService {
         customerRepository.delete(customer);
     }
 
+    public CustomerResponse promoteCustomerToStaff(String id) {
+        accessControlService.requireOwnerRole();
+
+        Customer customer = customerRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + id));
+
+        customer.setRole(UserRole.STAFF);
+        customer.setIsActive(true);
+        return DtoMapper.toCustomerResponse(customerRepository.save(customer));
+    }
+
     public CustomerResponse lockCustomer(String id) {
         return updateCustomerActiveStatus(id, false);
     }
@@ -106,13 +117,16 @@ public class CustomerService {
     @Transactional(readOnly = true)
     public Optional<CustomerResponse> findById(String id) {
         accessControlService.requireCustomerAccess(id);
-        return customerRepository.findById(id).map(DtoMapper::toCustomerResponse);
+        return customerRepository.findById(id)
+                .filter(customer -> customer.getRole() == UserRole.CUSTOMER)
+                .map(DtoMapper::toCustomerResponse);
     }
 
     @Transactional(readOnly = true)
     public Page<CustomerResponse> searchCustomers(CustomerSearchRequest request, Pageable pageable) {
         accessControlService.requirePrivilegedRole();
         return customerRepository.searchCustomers(
+                        UserRole.CUSTOMER,
                         normalizeSearchText(request.getFullName()),
                         normalizeSearchText(request.getEmail()),
                         normalizeSearchText(request.getPhone()),

@@ -24,8 +24,6 @@ import java.util.Optional;
 @Transactional
 public class StaffService {
 
-    private static final String STAFF_ID_REGEX = "^[A-Za-z0-9_-]{3,30}$";
-
     private final StaffRepository staffRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -44,7 +42,6 @@ public class StaffService {
         staff.setAddress(normalizeBlankToNull(request.getAddress()));
         staff.setGender(request.getGender());
         staff.setRole(request.getRole() == null ? UserRole.STAFF : request.getRole());
-        staff.setStaffId(request.getStaffId().trim());
 
         return DtoMapper.toStaffResponse(staffRepository.save(staff));
     }
@@ -62,7 +59,6 @@ public class StaffService {
         staff.setPhone(normalizeBlankToNull(request.getPhone()));
         staff.setAddress(normalizeBlankToNull(request.getAddress()));
         staff.setGender(request.getGender());
-        staff.setStaffId(request.getStaffId().trim());
 
         return DtoMapper.toStaffResponse(staffRepository.save(staff));
     }
@@ -108,10 +104,6 @@ public class StaffService {
         if (request.getPhone() != null && !request.getPhone().isBlank() && staffRepository.existsByPhone(request.getPhone().trim())) {
             throw new IllegalStateException("Phone already exists");
         }
-        validateStaffId(request.getStaffId());
-        if (staffRepository.existsByStaffId(request.getStaffId().trim())) {
-            throw new IllegalStateException("Staff code already exists");
-        }
     }
 
     private void validateUpdateRequest(String id, StaffUpdateRequest request) {
@@ -122,16 +114,6 @@ public class StaffService {
         String normalizedPhone = normalizeBlankToNull(request.getPhone());
         if (normalizedPhone != null && staffRepository.existsByPhoneAndIdNot(normalizedPhone, id)) {
             throw new IllegalStateException("Phone already exists");
-        }
-        validateStaffId(request.getStaffId());
-        if (staffRepository.existsByStaffIdAndIdNot(request.getStaffId().trim(), id)) {
-            throw new IllegalStateException("Staff code already exists");
-        }
-    }
-
-    private void validateStaffId(String staffId) {
-        if (staffId == null || staffId.isBlank() || !staffId.trim().matches(STAFF_ID_REGEX)) {
-            throw new IllegalArgumentException("Invalid staff code format");
         }
     }
 
