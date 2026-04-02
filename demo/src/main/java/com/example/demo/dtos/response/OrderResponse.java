@@ -19,6 +19,10 @@ public class OrderResponse {
     private OrderStatus status;
     private String customerId;
     private String customerUsername;
+    private String customerFullName;
+    private String customerPhone;
+    private String customerAddress;
     private String voucherCode;
     private List<OrderItemResponse> orderItems;
+    private List<OrderStatusHistoryResponse> timeline;
 }
