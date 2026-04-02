@@ -74,5 +74,10 @@ public class CustomerController {
     public ResponseEntity<CustomerResponse> unlock(@PathVariable String id) {
         return ResponseEntity.ok(customerService.unlockCustomer(id));
     }
+
+    @PatchMapping("/{id}/promote-to-staff")
+    public ResponseEntity<CustomerResponse> promoteToStaff(@PathVariable String id) {
+        return ResponseEntity.ok(customerService.promoteCustomerToStaff(id));
+    }
 }
 

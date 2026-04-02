@@ -1,6 +1,7 @@
 package com.example.demo.repositories;
 
 import com.example.demo.entities.Customer;
+import com.example.demo.entities.enums.UserRole;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
@@ -29,11 +30,13 @@ public interface CustomerRepository extends JpaRepository<Customer, String> {
     }
 
     @Query("SELECT c FROM Customer c " +
-            "WHERE (:fullName IS NULL OR LOWER(c.fullName) LIKE LOWER(CONCAT('%', :fullName, '%'))) " +
+            "WHERE c.role = :role " +
+            "AND (:fullName IS NULL OR LOWER(c.fullName) LIKE LOWER(CONCAT('%', :fullName, '%'))) " +
             "AND (:email IS NULL OR LOWER(c.email) LIKE LOWER(CONCAT('%', :email, '%'))) " +
             "AND (:phone IS NULL OR LOWER(COALESCE(c.phone, '')) LIKE LOWER(CONCAT('%', :phone, '%'))) " +
             "AND (:address IS NULL OR LOWER(COALESCE(c.address, '')) LIKE LOWER(CONCAT('%', :address, '%')))")
-    Page<Customer> searchCustomers(@Param("fullName") String fullName,
+    Page<Customer> searchCustomers(@Param("role") UserRole role,
+                                   @Param("fullName") String fullName,
                                    @Param("email") String email,
                                    @Param("phone") String phone,
                                    @Param("address") String address,

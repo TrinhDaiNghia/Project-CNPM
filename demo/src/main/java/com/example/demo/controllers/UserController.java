@@ -64,6 +64,18 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+    @PatchMapping("/{id}/lock")
+    public ResponseEntity<UserResponse> lockStaff(@PathVariable String id) {
+        User updated = userService.lockStaff(id);
+        return ResponseEntity.ok(toUserResponse(updated));
+    }
+
+    @PatchMapping("/{id}/unlock")
+    public ResponseEntity<UserResponse> unlockStaff(@PathVariable String id) {
+        User updated = userService.unlockStaff(id);
+        return ResponseEntity.ok(toUserResponse(updated));
+    }
+
     private User toUserEntity(UserCreateRequest request) {
         User user = new User();
         user.setUsername(request.getUsername());
@@ -99,6 +111,7 @@ public class UserController {
                 .address(user.getAddress())
                 .gender(user.getGender())
                 .role(user.getRole())
+                .isActive(user.getIsActive())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

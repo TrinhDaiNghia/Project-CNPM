@@ -8,24 +8,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
-
 @Repository
 public interface StaffRepository extends JpaRepository<Staff, String> {
-
-    Optional<Staff> findByStaffId(String staffId);
 
     boolean existsByEmail(String email);
 
     boolean existsByPhone(String phone);
 
-    boolean existsByStaffId(String staffId);
-
     boolean existsByEmailAndIdNot(String email, String id);
 
     boolean existsByPhoneAndIdNot(String phone, String id);
 
-    boolean existsByStaffIdAndIdNot(String staffId, String id);
 
     @Query("SELECT s FROM Staff s " +
             "WHERE (:keyword IS NULL OR " +

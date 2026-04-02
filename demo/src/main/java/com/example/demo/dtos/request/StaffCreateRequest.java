@@ -36,9 +36,5 @@ public class StaffCreateRequest {
     private UserGender gender;
 
     private UserRole role = UserRole.STAFF;
-
-    @NotBlank(message = "Staff code is required")
-    @Size(max = 30)
-    private String staffId;
 }
 
