@@ -1,6 +1,8 @@
 package com.example.demo.services;
 
 import com.example.demo.dtos.request.OrderRequest;
+import com.example.demo.dtos.response.OrderItemResponse;
+import com.example.demo.dtos.response.OrderResponse;
 import com.example.demo.entities.Customer;
 import com.example.demo.entities.Order;
 import com.example.demo.entities.OrderItem;
@@ -13,6 +15,7 @@ import com.example.demo.repositories.OrderRepository;
 import com.example.demo.repositories.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +35,8 @@ public class OrderService {
     private final VoucherService voucherService;
     private final AccessControlService accessControlService;
 
-    public Order createOrder(OrderRequest request) {
+    @Transactional
+    public OrderResponse createOrder(OrderRequest request) {
         accessControlService.requireCustomerAccess(request.getCustomerId());
 
         Customer customer = customerRepository.findById(request.getCustomerId())
@@ -71,10 +75,11 @@ public class OrderService {
         }
 
         order.setTotalAmount(Math.max(totalAmount, 0L));
-        return orderRepository.save(order);
+        return toOrderResponse(orderRepository.save(order));
     }
 
-    public Order updateOrderStatus(String id, OrderStatus status) {
+    @Transactional
+    public OrderResponse updateOrderStatus(String id, OrderStatus status) {
         accessControlService.requirePrivilegedRole();
         if (status == OrderStatus.CANCELLED) {
             throw new IllegalStateException("Use /api/orders/{id}/cancel to cancel an order");
@@ -84,15 +89,15 @@ public class OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
         order.setStatus(status);
         
-        return orderRepository.save(order);
+        return toOrderResponse(orderRepository.save(order));
     }
 
     @Transactional(readOnly = true)
-    public Optional<Order> findById(String id) {
+    public Optional<OrderResponse> findById(String id) {
         return orderRepository.findById(id)
                 .map(order -> {
                     accessControlService.requireCustomerAccess(order.getCustomer().getId());
-                    return order;
+                    return toOrderResponse(order);
                 });
     }
 
@@ -103,15 +108,57 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public Page<Order> findByCustomerId(String customerId, Pageable pageable) {
+    public Page<OrderResponse> findByCustomerId(String customerId, Pageable pageable) {
         accessControlService.requireCustomerAccess(customerId);
-        return orderRepository.findByCustomerId(customerId, pageable);
+        Page<Order> orderPage = orderRepository.findByCustomerId(customerId, pageable);
+        List<OrderResponse> responses = orderPage.getContent().stream()
+                .map(this::toOrderResponse)
+                .toList();
+        return new PageImpl<>(responses, pageable, orderPage.getTotalElements());
     }
 
     @Transactional(readOnly = true)
     public List<Order> findByStatus(OrderStatus status) {
         accessControlService.requirePrivilegedRole();
         return orderRepository.findByStatus(status);
+    }
+
+    public OrderResponse toOrderResponse(Order order) {
+        List<OrderItemResponse> itemResponses = order.getOrderItems().stream()
+                .map(item -> OrderItemResponse.builder()
+                        .id(item.getId())
+                        .productId(item.getProduct().getId())
+                        .productName(item.getProduct().getName())
+                        .quantity(item.getQuantity())
+                        .subTotal(item.getSubTotal())
+                        .build())
+                .toList();
+
+        return OrderResponse.builder()
+                .id(order.getId())
+                .orderDate(order.getOrderDate())
+                .totalAmount(order.getTotalAmount())
+                .note(order.getNote())
+                .shippingAddress(order.getShippingAddress())
+                .status(order.getStatus())
+                .customerId(order.getCustomer().getId())
+                .customerUsername(order.getCustomer().getUsername())
+                .customerFullName(order.getCustomer().getFullName())
+                .customerPhone(order.getCustomer().getPhone())
+                .customerAddress(order.getCustomer().getAddress())
+                .voucherCode(order.getVoucher() != null ? order.getVoucher().getCode() : null)
+                .orderItems(itemResponses)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<OrderResponse> findAllOrders(Pageable pageable) {
+        accessControlService.requirePrivilegedRole();
+        Page<Order> orderPage = orderRepository.findAll(pageable);
+        List<OrderResponse> responses = orderPage.getContent().stream()
+                .map(this::toOrderResponse)
+                .toList();
+        return new PageImpl<>(responses, pageable, orderPage.getTotalElements());
     }
 
     public void cancelOrder(String id) {
@@ -126,9 +173,3 @@ public class OrderService {
         orderRepository.save(order);
     }
 }
-
-
-
-
-
-
