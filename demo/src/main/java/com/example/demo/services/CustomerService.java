@@ -52,6 +52,7 @@ public class CustomerService {
         customer.setAddress(request.getAddress().trim());
         customer.setGender(request.getGender());
         customer.setRole(UserRole.CUSTOMER);
+        customer.setIsActive(true);
 
         return DtoMapper.toCustomerResponse(customerRepository.save(customer));
     }
@@ -94,6 +95,14 @@ public class CustomerService {
         customerRepository.delete(customer);
     }
 
+    public CustomerResponse lockCustomer(String id) {
+        return updateCustomerActiveStatus(id, false);
+    }
+
+    public CustomerResponse unlockCustomer(String id) {
+        return updateCustomerActiveStatus(id, true);
+    }
+
     @Transactional(readOnly = true)
     public Optional<CustomerResponse> findById(String id) {
         accessControlService.requireCustomerAccess(id);
@@ -124,6 +133,16 @@ public class CustomerService {
             return null;
         }
         return value.trim();
+    }
+
+    private CustomerResponse updateCustomerActiveStatus(String customerId, boolean isActive) {
+        accessControlService.requirePrivilegedRole();
+
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + customerId));
+
+        customer.setIsActive(isActive);
+        return DtoMapper.toCustomerResponse(customerRepository.save(customer));
     }
 }
 

@@ -44,6 +44,7 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.GET, "/api/customers/**").hasAnyRole("STAFF", "OWNER")
                         .requestMatchers(HttpMethod.POST, "/api/customers/**").hasAnyRole("STAFF", "OWNER")
+                        .requestMatchers(HttpMethod.PATCH, "/api/customers/**").hasAnyRole("STAFF", "OWNER")
                         .requestMatchers(HttpMethod.PUT, "/api/customers/**").hasAnyRole("STAFF", "OWNER", "CUSTOMER")
                         .requestMatchers(HttpMethod.DELETE, "/api/customers/**").hasAnyRole("STAFF", "OWNER")
 
@@ -78,6 +79,7 @@ public class SecurityConfig {
             return org.springframework.security.core.userdetails.User
                     .withUsername(foundUser.getUsername())
                     .password(foundUser.getPassword())
+                    .disabled(Boolean.FALSE.equals(foundUser.getIsActive()))
                     .roles(foundUser.getRole().name())
                     .build();
         };

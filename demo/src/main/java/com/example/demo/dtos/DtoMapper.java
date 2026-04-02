@@ -55,6 +55,7 @@ public final class DtoMapper {
                 .address(customer.getAddress())
                 .gender(customer.getGender())
                 .role(customer.getRole())
+                .isActive(customer.getIsActive())
                 .createdAt(customer.getCreatedAt())
                 .build();
     }

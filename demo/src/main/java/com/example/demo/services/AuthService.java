@@ -113,6 +113,10 @@ public class AuthService {
         }
 
         User user = optionalUser.get();
+        if (Boolean.FALSE.equals(user.getIsActive())) {
+            return Optional.empty();
+        }
+
         boolean validPassword = passwordEncoder.matches(request.getPassword(), user.getPassword());
         if (!validPassword) {
             return Optional.empty();

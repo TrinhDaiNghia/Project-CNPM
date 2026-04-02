@@ -54,6 +54,7 @@ public class SystemBotInitializer implements ApplicationRunner {
                     .email(normalizedEmail)
                     .address("SYSTEM")
                     .role(UserRole.STAFF)
+                    .isActive(true)
                     .build();
             userRepository.save(newBot);
             return;

@@ -63,6 +63,11 @@ public class User {
     @Column(name = "role", nullable = false, length = 20)
     private UserRole role;
 
+    @NotNull
+    @Column(name = "is_active", nullable = false)
+    @Builder.Default
+    private Boolean isActive = true;
+
     
     @CreationTimestamp
     @Temporal(TemporalType.TIMESTAMP)
@@ -78,4 +83,12 @@ public class User {
     @JsonIgnore
     @Builder.Default
     private List<Notification> receivedNotifications = new ArrayList<>();
+
+    @PrePersist
+    @PreUpdate
+    private void ensureDefaults() {
+        if (isActive == null) {
+            isActive = true;
+        }
+    }
 }
