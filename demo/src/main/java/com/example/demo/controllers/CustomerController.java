@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -62,6 +63,16 @@ public class CustomerController {
     public ResponseEntity<Void> delete(@PathVariable String id) {
         customerService.deleteCustomer(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/lock")
+    public ResponseEntity<CustomerResponse> lock(@PathVariable String id) {
+        return ResponseEntity.ok(customerService.lockCustomer(id));
+    }
+
+    @PatchMapping("/{id}/unlock")
+    public ResponseEntity<CustomerResponse> unlock(@PathVariable String id) {
+        return ResponseEntity.ok(customerService.unlockCustomer(id));
     }
 }
 
