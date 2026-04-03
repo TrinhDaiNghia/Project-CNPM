@@ -14,9 +14,11 @@ import java.util.List;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, String> {
 
-    List<Product> findByCategoryId(String categoryId);
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN p.categories c WHERE p.category.id = :categoryId OR c.id = :categoryId")
+    List<Product> findByAnyCategoryId(@Param("categoryId") String categoryId);
 
-    boolean existsByCategoryId(String categoryId);
+    @Query("SELECT CASE WHEN COUNT(DISTINCT p) > 0 THEN true ELSE false END FROM Product p LEFT JOIN p.categories c WHERE p.category.id = :categoryId OR c.id = :categoryId")
+    boolean existsByAnyCategoryId(@Param("categoryId") String categoryId);
 
     List<Product> findByStatus(ProductStatus status);
 
@@ -49,9 +51,11 @@ public interface ProductRepository extends JpaRepository<Product, String> {
     @Query("SELECT p FROM Product p WHERE p.brand = :brand AND p.status = :status")
     List<Product> findByBrandAndStatus(@Param("brand") String brand, @Param("status") ProductStatus status);
 
-    boolean existsByNameAndCategoryId(String name, String categoryId);
+    @Query("SELECT CASE WHEN COUNT(DISTINCT p) > 0 THEN true ELSE false END FROM Product p LEFT JOIN p.categories c WHERE LOWER(p.name) = LOWER(:name) AND (p.category.id = :categoryId OR c.id = :categoryId)")
+    boolean existsByNameAndAnyCategoryId(@Param("name") String name, @Param("categoryId") String categoryId);
 
-    boolean existsByNameAndCategoryIdAndIdNot(String name, String categoryId, String id);
+    @Query("SELECT CASE WHEN COUNT(DISTINCT p) > 0 THEN true ELSE false END FROM Product p LEFT JOIN p.categories c WHERE LOWER(p.name) = LOWER(:name) AND (p.category.id = :categoryId OR c.id = :categoryId) AND p.id <> :id")
+    boolean existsByNameAndAnyCategoryIdAndIdNot(@Param("name") String name, @Param("categoryId") String categoryId, @Param("id") String id);
 
     @Query("SELECT CASE WHEN COUNT(oi) > 0 THEN true ELSE false END FROM OrderItem oi WHERE oi.product.id = :productId")
     boolean existsRelatedTransactions(@Param("productId") String productId);

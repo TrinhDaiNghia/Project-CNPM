@@ -3,6 +3,8 @@ package com.example.demo.dtos.request;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class ProductRequest {
 
@@ -24,8 +26,9 @@ public class ProductRequest {
     @Min(value = 0)
     private Integer stockQuantity;
 
-    @NotBlank(message = "Category ID is required")
     private String categoryId;
+
+    private List<@NotBlank(message = "Category ID is required") String> categoryIds;
 
     @Size(max = 100)
     private String movementType;

@@ -50,7 +50,7 @@ public class CategoryService {
         if (!categoryRepository.existsById(id)) {
             throw new ResourceNotFoundException("Category not found: " + id);
         }
-        if (productRepository.existsByCategoryId(id)) {
+        if (productRepository.existsByAnyCategoryId(id)) {
             throw new IllegalStateException("Không thể xóa danh mục đang có sản phẩm.");
         }
         categoryRepository.deleteById(id);

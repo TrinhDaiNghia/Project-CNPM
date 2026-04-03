@@ -29,8 +29,12 @@ public class ProductResponse {
     private String size;
     private String specs;
     private ProductStatus status;
+    // Legacy fields retained for backward compatibility.
     private String categoryId;
     private String categoryName;
+    private List<String> categoryIds;
+    private List<String> categoryNames;
+    private List<ProductCategoryResponse> categories;
     private List<String> imageUrls;
     private Double averageRating;
     private Date updatedAt;
