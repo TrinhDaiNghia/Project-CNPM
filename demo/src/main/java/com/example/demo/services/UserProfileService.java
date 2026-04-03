@@ -52,10 +52,7 @@ public class UserProfileService {
     }
 
     private void ensureOwnerProfile(User user) {
-        if (ownerRepository.existsById(user.getId())) {
-            return;
-        }
-        ownerRepository.insertOwnerProfile(user.getId());
+        ownerRepository.upsertOwnerProfile(user.getId());
     }
 
     private void ensureStaffProfile(User user) {

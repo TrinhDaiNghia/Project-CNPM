@@ -49,6 +49,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/customers/**").hasAnyRole("STAFF", "OWNER")
 
                         .requestMatchers("/api/suppliers/**").hasRole("OWNER")
+                        .requestMatchers("/api/import-receipts/**").hasRole("OWNER")
                         .requestMatchers("/api/warranties/**").hasAnyRole("STAFF", "OWNER")
 
                         .requestMatchers(HttpMethod.GET, "/api/vouchers", "/api/vouchers/search").hasRole("OWNER")

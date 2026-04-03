@@ -6,7 +6,6 @@ import com.example.demo.dtos.response.ImportReceiptItemResponse;
 import com.example.demo.dtos.response.ImportReceiptResponse;
 import com.example.demo.entities.ImportDetail;
 import com.example.demo.entities.ImportReceipt;
-import com.example.demo.entities.Owner;
 import com.example.demo.entities.Product;
 import com.example.demo.entities.Supplier;
 import com.example.demo.entities.User;
@@ -41,8 +40,7 @@ public class ImportReceiptService {
         accessControlService.requireOwnerRole();
         User currentUser = accessControlService.getCurrentUserOrThrow();
 
-        Owner owner = ownerRepository.findById(currentUser.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Owner profile not found: " + currentUser.getId()));
+        ownerRepository.upsertOwnerProfile(currentUser.getId());
 
         Supplier supplier = supplierRepository.findById(request.getSupplierId())
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier not found: " + request.getSupplierId()));
@@ -53,7 +51,7 @@ public class ImportReceiptService {
 
         ImportReceipt receipt = ImportReceipt.builder()
                 .supplier(supplier)
-                .owner(owner)
+                .owner(currentUser)
                 .note(request.getNote())
                 .importDetails(new ArrayList<>())
                 .build();
