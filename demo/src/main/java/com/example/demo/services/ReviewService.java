@@ -10,6 +10,7 @@ import com.example.demo.repositories.CustomerRepository;
 import com.example.demo.repositories.ProductRepository;
 import com.example.demo.repositories.ReviewRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,28 +29,26 @@ public class ReviewService {
 
     public ReviewResponse createReview(ReviewRequest request) {
         accessControlService.requireCustomerAccess(request.getCustomerId());
-        Optional<Review> existingReview = reviewRepository.findByCustomerIdAndProductId(
-                request.getCustomerId(),
-                request.getProductId()
-        );
 
-        Review review;
-        if (existingReview.isPresent()) {
-            review = existingReview.get();
-        } else {
-            Customer customer = customerRepository.findById(request.getCustomerId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + request.getCustomerId()));
-            Product product = productRepository.findById(request.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + request.getProductId()));
-
-            review = new Review();
-            review.setCustomer(customer);
-            review.setProduct(product);
+        if (reviewRepository.existsByCustomerIdAndProductId(request.getCustomerId(), request.getProductId())) {
+            throw new IllegalStateException("Bạn đã đánh giá sản phẩm này rồi.");
         }
 
+        Customer customer = customerRepository.findById(request.getCustomerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + request.getCustomerId()));
+        Product product = productRepository.findById(request.getProductId())
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + request.getProductId()));
+
+        Review review = new Review();
+        review.setCustomer(customer);
+        review.setProduct(product);
         review.setRating(request.getRating());
         review.setComment(request.getComment());
-        return toResponse(reviewRepository.save(review));
+        try {
+            return toResponse(reviewRepository.save(review));
+        } catch (DataIntegrityViolationException ex) {
+            throw new IllegalStateException("Bạn đã đánh giá sản phẩm này rồi.");
+        }
     }
 
     public ReviewResponse updateReview(String id, ReviewRequest request) {
