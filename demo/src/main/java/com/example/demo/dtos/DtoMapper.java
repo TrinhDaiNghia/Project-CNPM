@@ -36,6 +36,7 @@ public final class DtoMapper {
                 .address(staff.getAddress())
                 .gender(staff.getGender())
                 .role(staff.getRole())
+                .isActive(staff.getIsActive())
                 .createdAt(staff.getCreatedAt())
                 .build();
     }
