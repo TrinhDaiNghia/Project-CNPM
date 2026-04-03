@@ -124,11 +124,9 @@ public class VoucherService {
 
     public Voucher consumeVoucher(String code) {
         Voucher voucher = validateVoucher(code);
-        voucher.setQuantity(voucher.getQuantity() - 1);
-        voucher.setUsedAt(new Date());
+        voucher.setUsageCount(voucher.getUsageCount() + 1);
         if (voucher.getQuantity() <= 0) {
             voucher.setQuantity(0);
-            voucher.setIsUsed(true);
             voucher.setStatus(VoucherStatus.USED_UP);
         }
         return voucherRepository.save(voucher);
@@ -143,9 +141,8 @@ public class VoucherService {
                 || now.after(voucher.getValidTo())) {
             throw new IllegalStateException("Voucher is not valid");
         }
-        if (Boolean.TRUE.equals(voucher.getIsUsed()) || voucher.getQuantity() <= 0) {
-            voucher.setIsUsed(true);
-            voucher.setQuantity(0);
+        if (voucher.getUsageCount() >= voucher.getQuantity()) {
+            voucher.setUsageCount(voucher.getQuantity());
             voucher.setStatus(VoucherStatus.USED_UP);
             voucherRepository.save(voucher);
             throw new IllegalStateException("Voucher has reached its usage limit");
@@ -199,8 +196,8 @@ public class VoucherService {
         voucher.setValidTo(validTo);
         voucher.setQuantity(quantity);
         voucher.setStatus(status == null ? VoucherStatus.ACTIVE : status);
-        if (voucher.getIsUsed() == null) {
-            voucher.setIsUsed(false);
+        if (voucher.getUsageCount() == null || voucher.getUsageCount() < 0) {
+            voucher.setUsageCount(0);
         }
         if (voucher.getQuantity() == null || voucher.getQuantity() < 1) {
             voucher.setQuantity(1);
