@@ -28,18 +28,25 @@ public class ReviewService {
 
     public ReviewResponse createReview(ReviewRequest request) {
         accessControlService.requireCustomerAccess(request.getCustomerId());
-        if (reviewRepository.existsByCustomerIdAndProductId(request.getCustomerId(), request.getProductId())) {
-            throw new IllegalStateException("Review already exists for this customer and product");
+        Optional<Review> existingReview = reviewRepository.findByCustomerIdAndProductId(
+                request.getCustomerId(),
+                request.getProductId()
+        );
+
+        Review review;
+        if (existingReview.isPresent()) {
+            review = existingReview.get();
+        } else {
+            Customer customer = customerRepository.findById(request.getCustomerId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + request.getCustomerId()));
+            Product product = productRepository.findById(request.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + request.getProductId()));
+
+            review = new Review();
+            review.setCustomer(customer);
+            review.setProduct(product);
         }
 
-        Customer customer = customerRepository.findById(request.getCustomerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + request.getCustomerId()));
-        Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + request.getProductId()));
-
-        Review review = new Review();
-        review.setCustomer(customer);
-        review.setProduct(product);
         review.setRating(request.getRating());
         review.setComment(request.getComment());
         return toResponse(reviewRepository.save(review));
