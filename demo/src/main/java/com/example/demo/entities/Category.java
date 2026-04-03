@@ -36,4 +36,9 @@ public class Category {
     @JsonIgnore
     @Builder.Default
     private List<Product> products = new ArrayList<>();
+
+    @ManyToMany(mappedBy = "categories", fetch = FetchType.LAZY)
+    @JsonIgnore
+    @Builder.Default
+    private List<Product> categorizedProducts = new ArrayList<>();
 }

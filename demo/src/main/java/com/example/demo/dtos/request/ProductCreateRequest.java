@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class ProductCreateRequest {
 
@@ -27,8 +29,9 @@ public class ProductCreateRequest {
     @Min(value = 0)
     private Integer stockQuantity;
 
-    @NotBlank(message = "Category ID is required")
     private String categoryId;
+
+    private List<@NotBlank(message = "Category ID is required") String> categoryIds;
 
     @Size(max = 100)
     private String movementType;

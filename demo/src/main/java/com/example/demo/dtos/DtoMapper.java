@@ -1,11 +1,13 @@
 package com.example.demo.dtos;
 
 import com.example.demo.dtos.response.CustomerResponse;
+import com.example.demo.dtos.response.ProductCategoryResponse;
 import com.example.demo.dtos.response.ProductResponse;
 import com.example.demo.dtos.response.StaffResponse;
 import com.example.demo.dtos.response.SupplierResponse;
 import com.example.demo.dtos.response.VoucherResponse;
 import com.example.demo.dtos.response.WarrantyResponse;
+import com.example.demo.entities.Category;
 import com.example.demo.entities.Customer;
 import com.example.demo.entities.Product;
 import com.example.demo.entities.ProductImage;
@@ -14,6 +16,7 @@ import com.example.demo.entities.Supplier;
 import com.example.demo.entities.Voucher;
 import com.example.demo.entities.Warranty;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -75,6 +78,11 @@ public final class DtoMapper {
         if (product == null) {
             return null;
         }
+
+        List<Category> categories = getEffectiveCategories(product);
+        String legacyCategoryId = categories.isEmpty() ? null : categories.get(0).getId();
+        String legacyCategoryName = categories.isEmpty() ? null : categories.get(0).getName();
+
         return ProductResponse.builder()
                 .id(product.getId())
                 .brand(product.getBrand())
@@ -94,8 +102,13 @@ public final class DtoMapper {
                 .size(product.getFaceSize())
                 .specs(buildSpecs(product))
                 .status(product.getStatus())
-                .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
-                .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
+                .categoryId(legacyCategoryId)
+                .categoryName(legacyCategoryName)
+                .categoryIds(categories.stream().map(Category::getId).toList())
+                .categoryNames(categories.stream().map(Category::getName).toList())
+                .categories(categories.stream()
+                        .map(category -> ProductCategoryResponse.builder().id(category.getId()).name(category.getName()).build())
+                        .toList())
                 .imageUrls(mapImageUrls(product.getImages()))
                 .averageRating(calculateAverageRating(product))
                 .updatedAt(product.getUpdatedAt())
@@ -138,6 +151,17 @@ public final class DtoMapper {
                 .status(voucher.getStatus())
                 .active(voucher.getStatus() != null && voucher.getStatus().name().equals("ACTIVE"))
                 .build();
+    }
+
+    private static List<Category> getEffectiveCategories(Product product) {
+        List<Category> categories = new ArrayList<>();
+        if (product.getCategories() != null) {
+            categories.addAll(product.getCategories());
+        }
+        if (categories.isEmpty() && product.getCategory() != null) {
+            categories.add(product.getCategory());
+        }
+        return categories;
     }
 
     private static List<String> mapImageUrls(List<ProductImage> images) {
