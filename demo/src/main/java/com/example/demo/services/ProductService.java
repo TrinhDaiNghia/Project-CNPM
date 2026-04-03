@@ -26,6 +26,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -213,7 +214,7 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public Page<Product> searchProducts(ProductSearchRequest request, Pageable pageable) {
+    public Page<ProductResponse> searchProducts(ProductSearchRequest request, Pageable pageable) {
         return productRepository.searchProducts(
                 normalizeSearchText(request.getName()),
                 normalizeSearchText(request.getBrand()),
@@ -221,7 +222,8 @@ public class ProductService {
                 normalizeSearchText(request.getFaceSize()),
                 normalizeSearchText(request.getSpec()),
                 request.getStatus(),
-                pageable);
+                pageable)
+                .map(this::toProductResponse);
     }
 
     @Transactional(readOnly = true)
@@ -374,21 +376,32 @@ public class ProductService {
                                     String specs,
                                     Category primaryCategory,
                                     List<Category> categories) {
+        String normalizedMovementType = normalizeOptionalText(movementType);
+        String normalizedGlassMaterial = normalizeOptionalText(glassMaterial);
+        String normalizedWaterResistance = normalizeOptionalText(waterResistance);
+        String normalizedFaceSize = normalizeOptionalText(faceSize);
+        String normalizedSize = normalizeOptionalText(size);
+        String normalizedWireMaterial = normalizeOptionalText(wireMaterial);
+        String normalizedWireColor = normalizeOptionalText(wireColor);
+        String normalizedCaseColor = normalizeOptionalText(caseColor);
+        String normalizedFaceColor = normalizeOptionalText(faceColor);
+        String normalizedColor = normalizeOptionalText(color);
+
         product.setBrand(brand);
         product.setName(name);
-        product.setDescription(description != null ? description : specs);
+        product.setDescription(normalizeOptionalText(description) != null ? normalizeOptionalText(description) : normalizeOptionalText(specs));
         product.setPrice(price);
         product.setStockQuantity(stockQuantity);
         product.setCategory(primaryCategory);
         product.setCategories(new ArrayList<>(categories));
-        product.setMovementType(movementType);
-        product.setGlassMaterial(glassMaterial);
-        product.setWaterResistance(waterResistance);
-        product.setFaceSize(faceSize != null ? faceSize : size);
-        product.setWireMaterial(wireMaterial);
-        product.setWireColor(wireColor != null ? wireColor : color);
-        product.setCaseColor(caseColor != null ? caseColor : color);
-        product.setFaceColor(faceColor != null ? faceColor : color);
+        product.setMovementType(normalizedMovementType);
+        product.setGlassMaterial(normalizedGlassMaterial);
+        product.setWaterResistance(normalizedWaterResistance);
+        product.setFaceSize(normalizedFaceSize != null ? normalizedFaceSize : normalizedSize);
+        product.setWireMaterial(normalizedWireMaterial);
+        product.setWireColor(normalizedWireColor != null ? normalizedWireColor : normalizedColor);
+        product.setCaseColor(normalizedCaseColor != null ? normalizedCaseColor : normalizedColor);
+        product.setFaceColor(normalizedFaceColor != null ? normalizedFaceColor : normalizedColor);
 
         if (product.getStatus() == null) {
             product.setStatus(ProductStatus.ACTIVE);
@@ -420,6 +433,9 @@ public class ProductService {
                 .wireColor(product.getWireColor())
                 .caseColor(product.getCaseColor())
                 .faceColor(product.getFaceColor())
+                .color(firstNonBlank(product.getWireColor(), product.getCaseColor(), product.getFaceColor()))
+                .size(product.getFaceSize())
+                .specs(buildSpecs(product))
                 .status(product.getStatus())
                 .categoryId(legacyCategoryId)
                 .categoryName(legacyCategoryName)
@@ -432,5 +448,25 @@ public class ProductService {
                 .averageRating(null)
                 .updatedAt(product.getUpdatedAt())
                 .build();
+    }
+
+    private String buildSpecs(Product product) {
+        return List.of(product.getMovementType(), product.getGlassMaterial(), product.getWaterResistance(), product.getWireMaterial())
+                .stream()
+                .filter(Objects::nonNull)
+                .filter(value -> !value.isBlank())
+                .collect(Collectors.joining(", "));
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 }
