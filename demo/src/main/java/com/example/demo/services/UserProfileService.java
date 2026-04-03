@@ -1,9 +1,7 @@
 package com.example.demo.services;
 
 import com.example.demo.entities.Customer;
-import com.example.demo.entities.Owner;
 import com.example.demo.entities.User;
-import com.example.demo.entities.enums.UserRole;
 import com.example.demo.repositories.CustomerRepository;
 import com.example.demo.repositories.OwnerRepository;
 import lombok.RequiredArgsConstructor;
@@ -54,10 +52,7 @@ public class UserProfileService {
         if (ownerRepository.existsById(user.getId())) {
             return;
         }
-
-        Owner owner = new Owner();
-        owner.setId(user.getId());
-        ownerRepository.save(owner);
+        ownerRepository.insertOwnerProfile(user.getId());
     }
 
     private void removeCustomerProfileIfExists(String userId) {
