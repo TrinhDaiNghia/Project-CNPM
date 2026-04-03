@@ -67,9 +67,6 @@ public class Voucher {
     @Builder.Default
     private VoucherStatus status = VoucherStatus.ACTIVE;
 
-    @Version
-    @Column(name = "version")
-    private Long version;
 
     @OneToMany(mappedBy = "voucher", fetch = FetchType.LAZY)
     @JsonIgnore
