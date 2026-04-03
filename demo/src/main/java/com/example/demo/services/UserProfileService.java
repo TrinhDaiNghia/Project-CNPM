@@ -4,6 +4,7 @@ import com.example.demo.entities.Customer;
 import com.example.demo.entities.User;
 import com.example.demo.repositories.CustomerRepository;
 import com.example.demo.repositories.OwnerRepository;
+import com.example.demo.repositories.StaffRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ public class UserProfileService {
 
     private final CustomerRepository customerRepository;
     private final OwnerRepository ownerRepository;
+    private final StaffRepository staffRepository;
 
     public void syncProfileForRole(User user) {
         if (user == null || user.getId() == null || user.getRole() == null) {
@@ -32,6 +34,7 @@ public class UserProfileService {
                 removeCustomerProfileIfExists(user.getId());
             }
             case STAFF -> {
+                ensureStaffProfile(user);
                 removeCustomerProfileIfExists(user.getId());
                 removeOwnerProfileIfExists(user.getId());
             }
@@ -55,13 +58,20 @@ public class UserProfileService {
         ownerRepository.insertOwnerProfile(user.getId());
     }
 
+    private void ensureStaffProfile(User user) {
+        if (staffRepository.existsById(user.getId())) {
+            return;
+        }
+        staffRepository.insertStaffProfile(user.getId());
+    }
+
     private void removeCustomerProfileIfExists(String userId) {
         if (!customerRepository.existsById(userId)) {
             return;
         }
 
         try {
-            customerRepository.deleteById(userId);
+            customerRepository.deleteCustomerProfileById(userId);
             customerRepository.flush();
         } catch (DataIntegrityViolationException ex) {
             throw new IllegalStateException("Cannot remove customer profile because it is referenced by business data", ex);

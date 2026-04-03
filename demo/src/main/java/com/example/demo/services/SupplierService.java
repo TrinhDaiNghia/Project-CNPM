@@ -51,7 +51,7 @@ public class SupplierService {
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier not found: " + id));
 
         if (supplierRepository.existsRelatedRecords(id)) {
-            throw new IllegalStateException("Cannot delete supplier because related import records exist");
+            throw new IllegalStateException("Không thể xóa nhà cung cấp vì đã có hóa đơn nhập hàng");
         }
 
         supplierRepository.delete(supplier);

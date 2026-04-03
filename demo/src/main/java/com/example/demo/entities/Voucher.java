@@ -5,9 +5,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UuidGenerator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
 
 import java.util.Date;
 import java.util.ArrayList;
@@ -38,9 +37,9 @@ public class Voucher {
     @Builder.Default
     private Integer discountPercent = 0;
 
-    @Column(name = "is_used", nullable = false)
+    @Column(name = "usage_count", nullable = false)
     @Builder.Default
-    private Boolean isUsed = false;
+    private Integer usageCount = 0;
 
     @NotNull(message = "Valid from date is required")
     @Temporal(TemporalType.TIMESTAMP)
@@ -52,9 +51,10 @@ public class Voucher {
     @Column(name = "valid_to", nullable = false)
     private Date validTo;
 
+    @CreationTimestamp
     @Temporal(TemporalType.TIMESTAMP)
-    @Column(name = "used_at")
-    private Date usedAt;
+    @Column(name = "created_at", updatable = false)
+    private Date createdAt;
 
     @Min(value = 1, message = "Quantity must be at least 1")
     @Column(name = "quantity", nullable = false)

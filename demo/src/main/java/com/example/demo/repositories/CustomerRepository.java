@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.stereotype.Repository;
 
 import java.util.Date;
@@ -52,6 +53,13 @@ public interface CustomerRepository extends JpaRepository<Customer, String> {
 
     @Query("SELECT CASE WHEN COUNT(o) > 0 THEN true ELSE false END FROM Order o WHERE o.customer.id = :customerId")
     boolean existsRelatedOrders(@Param("customerId") String customerId);
+
+    @Query("SELECT CASE WHEN COUNT(r) > 0 THEN true ELSE false END FROM Review r WHERE r.customer.id = :customerId")
+    boolean existsRelatedReviews(@Param("customerId") String customerId);
+
+    @Modifying
+    @Query(value = "DELETE FROM customers WHERE id = :customerId", nativeQuery = true)
+    int deleteCustomerProfileById(@Param("customerId") String customerId);
 
     @Query("SELECT COUNT(c) FROM Customer c " +
             "WHERE (:startDate IS NULL OR c.createdAt >= :startDate) " +

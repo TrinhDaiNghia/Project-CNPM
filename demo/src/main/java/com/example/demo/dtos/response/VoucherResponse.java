@@ -13,10 +13,10 @@ public class VoucherResponse {
     private String id;
     private String code;
     private Integer discountPercent;
-    private Boolean isUsed;
+    private Integer usageCount;
     private Date validFrom;
     private Date validTo;
-    private Date usedAt;
+    private Date createdAt;
     private Integer quantity;
     private VoucherStatus status;
     private Boolean active;
