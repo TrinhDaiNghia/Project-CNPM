@@ -11,6 +11,6 @@ import org.springframework.stereotype.Repository;
 public interface OwnerRepository extends JpaRepository<Owner, String> {
 
 	@Modifying
-	@Query(value = "INSERT INTO owners (id) VALUES (:id)", nativeQuery = true)
-	int insertOwnerProfile(@Param("id") String id);
+	@Query(value = "INSERT INTO owners (id) VALUES (:id) ON DUPLICATE KEY UPDATE id = id", nativeQuery = true)
+	int upsertOwnerProfile(@Param("id") String id);
 }
