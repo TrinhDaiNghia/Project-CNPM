@@ -1,5 +1,8 @@
 package com.example.demo.services;
 
+import com.example.demo.dtos.response.CartItemResponse;
+import com.example.demo.dtos.response.CartProductResponse;
+import com.example.demo.dtos.response.CartResponse;
 import com.example.demo.entities.Cart;
 import com.example.demo.entities.CartItem;
 import com.example.demo.entities.Customer;
@@ -12,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -22,6 +27,11 @@ public class CartService {
     private final ProductRepository productRepository;
     private final AccessControlService accessControlService;
 
+    @Transactional(readOnly = true)
+    public CartResponse getOrCreateCartResponse(String customerId) {
+        return toCartResponse(getOrCreateCart(customerId));
+    }
+
     public Cart getOrCreateCart(String customerId) {
         accessControlService.requireCustomerAccess(customerId);
         return cartRepository.findByCustomerId(customerId).orElseGet(() -> {
@@ -30,6 +40,10 @@ public class CartService {
             Cart cart = Cart.builder().customer(customer).build();
             return cartRepository.save(cart);
         });
+    }
+
+    public CartResponse addItemResponse(String customerId, String productId, int quantity) {
+        return toCartResponse(addItem(customerId, productId, quantity));
     }
 
     public Cart addItem(String customerId, String productId, int quantity) {
@@ -63,6 +77,10 @@ public class CartService {
         return cartRepository.save(cart);
     }
 
+    public CartResponse updateItemQuantityResponse(String customerId, String productId, int quantity) {
+        return toCartResponse(updateItemQuantity(customerId, productId, quantity));
+    }
+
     public Cart updateItemQuantity(String customerId, String productId, int quantity) {
         Cart cart = getOrCreateCart(customerId);
         if (quantity <= 0) {
@@ -77,6 +95,10 @@ public class CartService {
                 });
         recalcTotal(cart);
         return cartRepository.save(cart);
+    }
+
+    public CartResponse removeItemResponse(String customerId, String productId) {
+        return toCartResponse(removeItem(customerId, productId));
     }
 
     public Cart removeItem(String customerId, String productId) {
@@ -98,5 +120,27 @@ public class CartService {
                 .mapToLong(item -> item.getProduct().getPrice() * item.getQuantity())
                 .sum();
         cart.setTotalAmount(total);
+    }
+
+    private CartResponse toCartResponse(Cart cart) {
+        List<CartItemResponse> items = cart.getItems().stream()
+                .map(item -> CartItemResponse.builder()
+                        .id(item.getId())
+                        .quantity(item.getQuantity())
+                        .subTotal(item.getSubTotal())
+                        .product(CartProductResponse.builder()
+                                .id(item.getProduct().getId())
+                                .name(item.getProduct().getName())
+                                .price(item.getProduct().getPrice())
+                                .build())
+                        .build())
+                .toList();
+
+        return CartResponse.builder()
+                .id(cart.getId())
+                .totalAmount(cart.getTotalAmount())
+                .customerId(cart.getCustomer().getId())
+                .items(items)
+                .build();
     }
 }
