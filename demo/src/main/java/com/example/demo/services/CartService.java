@@ -27,8 +27,14 @@ public class CartService {
     private final ProductRepository productRepository;
     private final AccessControlService accessControlService;
 
+    @Transactional(readOnly = true)
     public CartResponse getOrCreateCart(String customerId) {
         return toResponse(getOrCreateCartEntity(customerId));
+    }
+
+    @Transactional(readOnly = true)
+    public CartResponse getOrCreateCartResponse(String customerId) {
+        return getOrCreateCart(customerId);
     }
 
     private Cart getOrCreateCartEntity(String customerId) {
@@ -49,32 +55,40 @@ public class CartService {
         Cart cart = getOrCreateCartEntity(customerId);
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+
         int availableStock = stockOf(product);
         if (quantity > availableStock) {
             throw new IllegalArgumentException("Số lượng vượt quá tồn kho");
         }
 
         cart.getItems().stream()
-                .filter(item -> item.getProduct().getId().equals(productId))
+                .filter(item -> item.getProduct() != null && item.getProduct().getId().equals(productId))
                 .findFirst()
                 .ifPresentOrElse(
                         item -> {
-                            int nextQuantity = item.getQuantity() + quantity;
+                            int current = item.getQuantity() == null ? 0 : item.getQuantity();
+                            int nextQuantity = current + quantity;
+                            long price = item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice();
                             item.setQuantity(nextQuantity);
-                            item.setSubTotal(item.getProduct().getPrice() * nextQuantity);
+                            item.setSubTotal(price * nextQuantity);
                         },
                         () -> cart.getItems().add(
                                 CartItem.builder()
                                         .cart(cart)
                                         .product(product)
                                         .quantity(quantity)
-                                        .subTotal(product.getPrice() * quantity)
+                                        .subTotal((product.getPrice() == null ? 0L : product.getPrice()) * quantity)
                                         .build()
                         )
                 );
+
         product.setStockQuantity(availableStock - quantity);
         recalcTotal(cart);
         return toResponse(cartRepository.save(cart));
+    }
+
+    public CartResponse addItemResponse(String customerId, String productId, int quantity) {
+        return addItem(customerId, productId, quantity);
     }
 
     public CartResponse updateItemQuantity(String customerId, String productId, int quantity) {
@@ -82,14 +96,21 @@ public class CartService {
         if (quantity <= 0) {
             return removeItem(customerId, productId);
         }
+
         CartItem item = cart.getItems().stream()
-                .filter(cartItem -> cartItem.getProduct().getId().equals(productId))
+                .filter(cartItem -> cartItem.getProduct() != null && cartItem.getProduct().getId().equals(productId))
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm không tồn tại trong giỏ hàng: " + productId));
+
         Product product = item.getProduct();
-        int currentQuantity = item.getQuantity();
+        if (product == null) {
+            throw new ResourceNotFoundException("Product not found: " + productId);
+        }
+
+        int currentQuantity = item.getQuantity() == null ? 0 : item.getQuantity();
         int delta = quantity - currentQuantity;
         int availableStock = stockOf(product);
+
         if (delta > 0) {
             if (delta > availableStock) {
                 throw new IllegalArgumentException("Số lượng vượt quá tồn kho");
@@ -99,23 +120,38 @@ public class CartService {
             product.setStockQuantity(availableStock + Math.abs(delta));
         }
 
+        long price = product.getPrice() == null ? 0L : product.getPrice();
         item.setQuantity(quantity);
-        item.setSubTotal(item.getProduct().getPrice() * quantity);
+        item.setSubTotal(price * quantity);
+
         recalcTotal(cart);
         return toResponse(cartRepository.save(cart));
+    }
+
+    public CartResponse updateItemQuantityResponse(String customerId, String productId, int quantity) {
+        return updateItemQuantity(customerId, productId, quantity);
     }
 
     public CartResponse removeItem(String customerId, String productId) {
         Cart cart = getOrCreateCartEntity(customerId);
         CartItem target = cart.getItems().stream()
-                .filter(item -> item.getProduct().getId().equals(productId))
+                .filter(item -> item.getProduct() != null && item.getProduct().getId().equals(productId))
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm không tồn tại trong giỏ hàng: " + productId));
+
         Product product = target.getProduct();
-        product.setStockQuantity(stockOf(product) + target.getQuantity());
+        int quantity = target.getQuantity() == null ? 0 : target.getQuantity();
+        if (product != null) {
+            product.setStockQuantity(stockOf(product) + quantity);
+        }
+
         cart.getItems().remove(target);
         recalcTotal(cart);
         return toResponse(cartRepository.save(cart));
+    }
+
+    public CartResponse removeItemResponse(String customerId, String productId) {
+        return removeItem(customerId, productId);
     }
 
     public void clearCart(String customerId) {
@@ -127,7 +163,10 @@ public class CartService {
         if (restock) {
             cart.getItems().forEach(item -> {
                 Product product = item.getProduct();
-                product.setStockQuantity(stockOf(product) + item.getQuantity());
+                int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+                if (product != null) {
+                    product.setStockQuantity(stockOf(product) + quantity);
+                }
             });
         }
         cart.getItems().clear();
@@ -136,12 +175,19 @@ public class CartService {
     }
 
     private int stockOf(Product product) {
-        return product.getStockQuantity() == null ? 0 : Math.max(product.getStockQuantity(), 0);
+        if (product == null || product.getStockQuantity() == null) {
+            return 0;
+        }
+        return Math.max(product.getStockQuantity(), 0);
     }
 
     private void recalcTotal(Cart cart) {
         long total = cart.getItems().stream()
-                .mapToLong(item -> item.getProduct().getPrice() * item.getQuantity())
+                .mapToLong(item -> {
+                    long price = item.getProduct() == null || item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice();
+                    int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+                    return price * quantity;
+                })
                 .sum();
         cart.setTotalAmount(total);
     }
@@ -160,13 +206,13 @@ public class CartService {
     }
 
     private CartItemResponse toItemResponse(CartItem item) {
-        long subTotal = item.getSubTotal() == null
-                ? (item.getProduct() == null || item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice() * item.getQuantity())
-                : item.getSubTotal();
+        int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+        long unitPrice = item.getProduct() == null || item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice();
+        long subTotal = item.getSubTotal() == null ? unitPrice * quantity : item.getSubTotal();
 
         return CartItemResponse.builder()
                 .id(item.getId())
-                .quantity(item.getQuantity())
+                .quantity(quantity)
                 .subTotal(subTotal)
                 .product(toProductResponse(item.getProduct()))
                 .build();

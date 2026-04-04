@@ -15,7 +15,7 @@ public class CartController {
 
     @GetMapping("/{customerId}")
     public ResponseEntity<CartResponse> getCart(@PathVariable String customerId) {
-        return ResponseEntity.ok(cartService.getOrCreateCart(customerId));
+        return ResponseEntity.ok(cartService.getOrCreateCartResponse(customerId));
     }
 
     @PostMapping("/{customerId}/items")
@@ -23,7 +23,7 @@ public class CartController {
             @PathVariable String customerId,
             @RequestParam String productId,
             @RequestParam int quantity) {
-        return ResponseEntity.ok(cartService.addItem(customerId, productId, quantity));
+        return ResponseEntity.ok(cartService.addItemResponse(customerId, productId, quantity));
     }
 
     @PutMapping("/{customerId}/items/{productId}")
@@ -31,14 +31,14 @@ public class CartController {
             @PathVariable String customerId,
             @PathVariable String productId,
             @RequestParam int quantity) {
-        return ResponseEntity.ok(cartService.updateItemQuantity(customerId, productId, quantity));
+        return ResponseEntity.ok(cartService.updateItemQuantityResponse(customerId, productId, quantity));
     }
 
     @DeleteMapping("/{customerId}/items/{productId}")
     public ResponseEntity<CartResponse> removeItem(
             @PathVariable String customerId,
             @PathVariable String productId) {
-        return ResponseEntity.ok(cartService.removeItem(customerId, productId));
+        return ResponseEntity.ok(cartService.removeItemResponse(customerId, productId));
     }
 
     @DeleteMapping("/{customerId}/clear")
