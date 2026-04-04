@@ -1,5 +1,6 @@
 package com.example.demo.services;
 
+import com.example.demo.dtos.response.PageResponse;
 import com.example.demo.dtos.response.ProductDiscussionAskResponse;
 import com.example.demo.dtos.response.ProductDiscussionMessageResponse;
 import com.example.demo.entities.DiscussionMessage;
@@ -11,11 +12,15 @@ import com.example.demo.entities.enums.UserRole;
 import com.example.demo.exceptions.ResourceNotFoundException;
 import com.example.demo.repositories.DiscussionMessageRepository;
 import com.example.demo.repositories.ProductRepository;
+import com.example.demo.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -23,7 +28,11 @@ import org.springframework.util.StringUtils;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,16 +41,35 @@ public class ProductDiscussionService {
 
     private final DiscussionMessageRepository discussionMessageRepository;
     private final ProductRepository productRepository;
-    private final QdrantService qdrantService;
+    private final UserRepository userRepository;
     private final GeminiService geminiService;
     private final AccessControlService accessControlService;
 
     @Transactional(readOnly = true)
-    public List<ProductDiscussionMessageResponse> listByProduct(String productId) {
+    public PageResponse<ProductDiscussionMessageResponse> listByProduct(String productId, int page, int pageSize) {
         ensureProductExists(productId);
-        return discussionMessageRepository.findByProductIdOrderByCreatedAtAsc(productId).stream()
-                .map(this::toResponse)
+        int safePage = Math.max(1, page);
+        int safePageSize = Math.max(1, pageSize);
+        Pageable pageable = PageRequest.of(safePage - 1, safePageSize);
+
+        // Phân trang theo câu hỏi gốc (mới nhất trước), không phân trang theo từng message.
+        Page<DiscussionMessage> questionPage =
+                discussionMessageRepository.findByProductIdAndParentIdIsNullOrderByCreatedAtDesc(productId, pageable);
+
+        List<DiscussionMessage> orderedMessages = buildOrderedMessages(productId, questionPage.getContent());
+        Map<String, String> senderNames = resolveSenderNames(orderedMessages);
+
+        List<ProductDiscussionMessageResponse> items = orderedMessages.stream()
+                .map(message -> toResponse(message, senderNames))
                 .toList();
+
+        return PageResponse.<ProductDiscussionMessageResponse>builder()
+                .items(items)
+                .page(safePage)
+                .pageSize(safePageSize)
+                .total(questionPage.getTotalElements())
+                .totalPages(questionPage.getTotalPages())
+                .build();
     }
 
     @Transactional
@@ -70,12 +98,10 @@ public class ProductDiscussionService {
                         .build()
         );
 
-        String context = qdrantService.searchRelevantContextByProduct(productId, normalizedQuestion);
-        if (!StringUtils.hasText(context)) {
-            context = buildFallbackContext(product);
-        }
+        // THẢO LUẬN sản phẩm: chỉ dùng dữ liệu trực tiếp từ bảng product.
+        String context = buildProductContext(product);
 
-        String answer = geminiService.generateAnswer(context, normalizedQuestion, history);
+        String answer = geminiService.generateDiscussionAnswer(context, normalizedQuestion, history);
         if (!StringUtils.hasText(answer)) {
             answer = "Xin lỗi, hiện tại hệ thống chưa thể trả lời câu hỏi này. Vui lòng thử lại sau.";
         }
@@ -92,9 +118,14 @@ public class ProductDiscussionService {
                         .build()
         );
 
+        Map<String, String> askSenderNames = Map.of(
+                currentUser.getId(),
+                StringUtils.hasText(currentUser.getFullName()) ? currentUser.getFullName().trim() : currentUser.getUsername()
+        );
+
         return ProductDiscussionAskResponse.builder()
-                .question(toResponse(questionMessage))
-                .answer(toResponse(answerMessage))
+                .question(toResponse(questionMessage, askSenderNames))
+                .answer(toResponse(answerMessage, askSenderNames))
                 .build();
     }
 
@@ -130,7 +161,7 @@ public class ProductDiscussionService {
         }
     }
 
-    private String buildFallbackContext(Product product) {
+    private String buildProductContext(Product product) {
         return String.format(
                 "Sản phẩm: %s. Thương hiệu: %s. Giá bán: %s VND. Số lượng tồn kho: %d. Loại máy: %s. Chất liệu kính: %s. " +
                         "Kháng nước: %s. Kích thước mặt: %s. Chất liệu dây: %s. Màu dây: %s. Màu vỏ: %s. " +
@@ -162,11 +193,67 @@ public class ProductDiscussionService {
         return String.format("%,d", price);
     }
 
-    private ProductDiscussionMessageResponse toResponse(DiscussionMessage message) {
+    private List<DiscussionMessage> buildOrderedMessages(String productId, List<DiscussionMessage> questions) {
+        if (questions == null || questions.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> questionIds = questions.stream()
+                .map(DiscussionMessage::getId)
+                .filter(StringUtils::hasText)
+                .toList();
+        if (questionIds.isEmpty()) {
+            return questions;
+        }
+
+        List<DiscussionMessage> answers =
+                discussionMessageRepository.findByProductIdAndParentIdInOrderByCreatedAtAsc(productId, questionIds);
+        Map<String, List<DiscussionMessage>> answersByParent = answers.stream()
+                .collect(Collectors.groupingBy(DiscussionMessage::getParentId, LinkedHashMap::new, Collectors.toList()));
+
+        List<DiscussionMessage> ordered = new ArrayList<>();
+        for (DiscussionMessage question : questions) {
+            ordered.add(question);
+            ordered.addAll(answersByParent.getOrDefault(question.getId(), List.of()));
+        }
+        return ordered;
+    }
+
+    private Map<String, String> resolveSenderNames(List<DiscussionMessage> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return Map.of();
+        }
+
+        Set<String> userIds = messages.stream()
+                .filter(message -> message.getHandledBy() != DiscussionHandledBy.AI)
+                .map(DiscussionMessage::getUserId)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(
+                        User::getId,
+                        user -> StringUtils.hasText(user.getFullName()) ? user.getFullName().trim() : user.getUsername(),
+                        (left, right) -> left
+                ));
+    }
+
+    private ProductDiscussionMessageResponse toResponse(DiscussionMessage message, Map<String, String> senderNames) {
+        String senderName;
+        if (message.getHandledBy() == DiscussionHandledBy.AI) {
+            senderName = "AI Assistant";
+        } else {
+            senderName = senderNames.getOrDefault(message.getUserId(), "Khách hàng");
+        }
+
         return ProductDiscussionMessageResponse.builder()
                 .id(message.getId())
                 .productId(message.getProductId())
                 .userId(message.getUserId())
+                .senderName(senderName)
                 .content(message.getContent())
                 .parentId(message.getParentId())
                 .role(message.getRole() == null ? null : message.getRole().name())

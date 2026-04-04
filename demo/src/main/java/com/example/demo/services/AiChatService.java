@@ -1,19 +1,16 @@
 package com.example.demo.services;
 
 import com.example.demo.entities.Chat;
-import com.example.demo.entities.Customer;
 import com.example.demo.entities.ChatMessage;
-import com.example.demo.entities.Product;
+import com.example.demo.entities.Customer;
 import com.example.demo.entities.User;
 import com.example.demo.entities.enums.ChatHandledBy;
 import com.example.demo.entities.enums.ChatMessageRole;
-import com.example.demo.entities.enums.ProductStatus;
 import com.example.demo.entities.enums.UserRole;
 import com.example.demo.exceptions.ResourceNotFoundException;
+import com.example.demo.repositories.ChatMessageRepository;
 import com.example.demo.repositories.ChatRepository;
 import com.example.demo.repositories.CustomerRepository;
-import com.example.demo.repositories.ChatMessageRepository;
-import com.example.demo.repositories.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -26,14 +23,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.text.Normalizer;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 
 @Service
@@ -52,7 +46,6 @@ public class AiChatService {
     private final CustomerRepository customerRepository;
     private final ChatRepository chatRepository;
     private final ChatMessageRepository chatMessageRepository;
-    private final ProductRepository productRepository;
 
     @Transactional
     public AiChatResult chatWithBot(String userMessage) {
@@ -64,9 +57,10 @@ public class AiChatService {
             return new AiChatResult(STAFF_HANDOFF_MESSAGE, "STAFF");
         }
 
-        String context = buildChatContext(userMessage);
+        // CHAT tổng quát: chỉ dùng ngữ cảnh từ Qdrant.
+        String context = qdrantService.searchRelevantContext(userMessage);
         List<Message> history = buildRecentAiHistoryForCurrentCustomer();
-        String botResponse = geminiService.generateAnswer(context, userMessage, history);
+        String botResponse = geminiService.generateChatAnswer(context, userMessage, history);
         saveAiConversationIfCustomer(userMessage, botResponse);
 
         log.info("{} response: {}", BOT_DISPLAY_NAME, botResponse);
@@ -359,97 +353,9 @@ public class AiChatService {
         return createdAt.toInstant().toString();
     }
 
-    private String buildChatContext(String userMessage) {
-        String qdrantContext = qdrantService.searchRelevantContext(userMessage);
-        String inventoryContext = shouldIncludeInventoryContext(userMessage) ? buildInventoryContext() : "";
-
-        if (!StringUtils.hasText(inventoryContext)) {
-            return qdrantContext;
-        }
-        if (!StringUtils.hasText(qdrantContext)) {
-            return inventoryContext;
-        }
-        return qdrantContext + "\n---\n" + inventoryContext;
-    }
-
-    private boolean shouldIncludeInventoryContext(String userMessage) {
-        if (!StringUtils.hasText(userMessage)) {
-            return false;
-        }
-
-        String normalized = normalizeForIntent(userMessage);
-        return normalized.contains("ban gi")
-                || normalized.contains("san pham")
-                || normalized.contains("so luong")
-                || normalized.contains("ton kho")
-                || normalized.contains("con hang")
-                || normalized.contains("liet ke")
-                || normalized.contains("danh muc")
-                || normalized.contains("bao nhieu");
-    }
-
-    private String buildInventoryContext() {
-        List<Product> activeProducts = productRepository.findByStatus(ProductStatus.ACTIVE).stream()
-                .sorted(Comparator.comparing(product -> safeText(product.getName()), String.CASE_INSENSITIVE_ORDER))
-                .toList();
-
-        if (activeProducts.isEmpty()) {
-            return "DỮ LIỆU TỒN KHO TOÀN CỬA HÀNG: không có sản phẩm đang bán.";
-        }
-
-        int totalStock = activeProducts.stream()
-                .map(Product::getStockQuantity)
-                .filter(value -> value != null && value > 0)
-                .mapToInt(Integer::intValue)
-                .sum();
-
-        int maxItems = 40;
-        StringBuilder builder = new StringBuilder();
-        builder.append("DỮ LIỆU TỒN KHO TOÀN CỬA HÀNG: ")
-                .append("tổng số mẫu đang bán = ").append(activeProducts.size())
-                .append(", tổng số lượng tồn = ").append(totalStock).append(".")
-                .append("\n");
-
-        int limit = Math.min(maxItems, activeProducts.size());
-        for (int i = 0; i < limit; i++) {
-            Product product = activeProducts.get(i);
-            int stock = product.getStockQuantity() == null ? 0 : Math.max(0, product.getStockQuantity());
-            String brand = StringUtils.hasText(product.getBrand()) ? product.getBrand().trim() : "Không rõ thương hiệu";
-            builder.append("Sản phẩm ")
-                    .append(i + 1)
-                    .append(": id=").append(product.getId())
-                    .append(", tên=").append(product.getName())
-                    .append(", thương hiệu=").append(brand)
-                    .append(", số lượng tồn=").append(stock)
-                    .append(".\n");
-        }
-        if (activeProducts.size() > limit) {
-            builder.append("Còn ")
-                    .append(activeProducts.size() - limit)
-                    .append(" sản phẩm đang bán khác không hiển thị trong danh sách rút gọn.");
-        }
-        return builder.toString().trim();
-    }
-
-    private String normalizeForIntent(String input) {
-        String lower = input.toLowerCase(Locale.ROOT);
-        String noAccent = Normalizer.normalize(lower, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}+", "");
-        return noAccent.replace('\u0111', 'd')
-                .replaceAll("[^a-z0-9\\s]", " ")
-                .replaceAll("\\s+", " ")
-                .trim();
-    }
-
-    private String safeText(String value) {
-        return value == null ? "" : value;
-    }
-
     public record AiChatResult(String message, String handledBy) {
     }
 
     public record ChatHistoryMessage(String id, String role, String content, String createdAt, String handledBy) {
     }
 }
-
-

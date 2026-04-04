@@ -10,6 +10,7 @@ public class ProductDiscussionMessageResponse {
     private String id;
     private String productId;
     private String userId;
+    private String senderName;
     private String content;
     private String parentId;
     private String role;
@@ -17,4 +18,3 @@ public class ProductDiscussionMessageResponse {
     private Boolean aiHandled;
     private String createdAt;
 }
-
