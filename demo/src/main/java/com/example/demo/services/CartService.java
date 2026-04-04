@@ -43,12 +43,16 @@ public class CartService {
 
     public CartResponse addItem(String customerId, String productId, int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("Quantity must be greater than 0");
+            throw new IllegalArgumentException("Số lượng phải lớn hơn 0");
         }
 
         Cart cart = getOrCreateCartEntity(customerId);
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+        int availableStock = stockOf(product);
+        if (quantity > availableStock) {
+            throw new IllegalArgumentException("Số lượng vượt quá tồn kho");
+        }
 
         cart.getItems().stream()
                 .filter(item -> item.getProduct().getId().equals(productId))
@@ -68,6 +72,7 @@ public class CartService {
                                         .build()
                         )
                 );
+        product.setStockQuantity(availableStock - quantity);
         recalcTotal(cart);
         return toResponse(cartRepository.save(cart));
     }
@@ -77,29 +82,61 @@ public class CartService {
         if (quantity <= 0) {
             return removeItem(customerId, productId);
         }
-        cart.getItems().stream()
-                .filter(item -> item.getProduct().getId().equals(productId))
+        CartItem item = cart.getItems().stream()
+                .filter(cartItem -> cartItem.getProduct().getId().equals(productId))
                 .findFirst()
-                .ifPresent(item -> {
-                    item.setQuantity(quantity);
-                    item.setSubTotal(item.getProduct().getPrice() * quantity);
-                });
+                .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm không tồn tại trong giỏ hàng: " + productId));
+        Product product = item.getProduct();
+        int currentQuantity = item.getQuantity();
+        int delta = quantity - currentQuantity;
+        int availableStock = stockOf(product);
+        if (delta > 0) {
+            if (delta > availableStock) {
+                throw new IllegalArgumentException("Số lượng vượt quá tồn kho");
+            }
+            product.setStockQuantity(availableStock - delta);
+        } else if (delta < 0) {
+            product.setStockQuantity(availableStock + Math.abs(delta));
+        }
+
+        item.setQuantity(quantity);
+        item.setSubTotal(item.getProduct().getPrice() * quantity);
         recalcTotal(cart);
         return toResponse(cartRepository.save(cart));
     }
 
     public CartResponse removeItem(String customerId, String productId) {
         Cart cart = getOrCreateCartEntity(customerId);
-        cart.getItems().removeIf(item -> item.getProduct().getId().equals(productId));
+        CartItem target = cart.getItems().stream()
+                .filter(item -> item.getProduct().getId().equals(productId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm không tồn tại trong giỏ hàng: " + productId));
+        Product product = target.getProduct();
+        product.setStockQuantity(stockOf(product) + target.getQuantity());
+        cart.getItems().remove(target);
         recalcTotal(cart);
         return toResponse(cartRepository.save(cart));
     }
 
     public void clearCart(String customerId) {
+        clearCart(customerId, true);
+    }
+
+    public void clearCart(String customerId, boolean restock) {
         Cart cart = getOrCreateCartEntity(customerId);
+        if (restock) {
+            cart.getItems().forEach(item -> {
+                Product product = item.getProduct();
+                product.setStockQuantity(stockOf(product) + item.getQuantity());
+            });
+        }
         cart.getItems().clear();
         cart.setTotalAmount(0L);
         cartRepository.save(cart);
+    }
+
+    private int stockOf(Product product) {
+        return product.getStockQuantity() == null ? 0 : Math.max(product.getStockQuantity(), 0);
     }
 
     private void recalcTotal(Cart cart) {
