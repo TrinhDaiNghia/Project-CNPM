@@ -642,7 +642,7 @@ public class OrderService {
         if (StringUtils.hasText(note)) {
             body.append("Ghi chú: ").append(note).append("\n");
         }
-        if (refundRequired) {
+        if (paidOrder) {
             body.append(REFUND_PROCESSING_MESSAGE).append("\n");
         }
         if (restockIssue) {
@@ -664,3 +664,4 @@ public class OrderService {
         }, "order-cancel-email-sender").start();
     }
 }
+
