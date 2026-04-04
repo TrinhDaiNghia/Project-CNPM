@@ -26,5 +26,5 @@ public class Customer extends User {
     private List<Review> reviews = new ArrayList<>();
 
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Discuss> discussions = new ArrayList<>();
+    private List<Chat> chats = new ArrayList<>();
 }

@@ -7,7 +7,7 @@ import java.util.Date;
 
 @Data
 @Builder
-public class SupportDiscussionResponse {
+public class SupportChatResponse {
 
     private String id;
     private String customerId;

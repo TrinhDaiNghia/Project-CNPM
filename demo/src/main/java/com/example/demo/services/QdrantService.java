@@ -25,7 +25,7 @@ public class QdrantService {
     private int searchTopK;
 
     /**
-     * Day thong tin san pham len Qdrant (Upsert)
+     * Đẩy thông tin sản phẩm lên Qdrant (Upsert)
      */
     public void upsertProduct(Product product) {
         try {
@@ -72,7 +72,7 @@ public class QdrantService {
     }
 
     /**
-     * Xoa san pham khoi Qdrant
+     * Xóa sản phẩm khỏi Qdrant
      */
     public void deleteProduct(String productId) {
         try {
@@ -83,7 +83,7 @@ public class QdrantService {
     }
 
     /**
-     * Tim kiem cac san pham co dac diem tuong dong voi cau hoi cua khach
+     * Tìm kiếm các sản phẩm có đặc điểm tương đồng với câu hỏi của khách
      */
     public String searchRelevantContext(String query) {
         try {
@@ -92,19 +92,59 @@ public class QdrantService {
                 SearchRequest.builder().query(query).topK(topK).build()
             );
 
-            return results.stream()
-                .map(Document::getText)
-                .filter(StringUtils::hasText)
-                .collect(Collectors.joining("\n---\n"));
+            return joinDocumentTexts(results);
         } catch (Exception ex) {
             log.error("Failed to search context from Qdrant for query: {}", query, ex);
             return "";
         }
     }
 
+    /**
+     * Tìm context từ embeddings, chỉ lấy document của đúng productId.
+     */
+    public String searchRelevantContextByProduct(String productId, String query) {
+        if (!StringUtils.hasText(productId)) {
+            return "";
+        }
+
+        try {
+            int topK = Math.max(10, searchTopK * 4);
+            List<Document> results = vectorStore.similaritySearch(
+                    SearchRequest.builder().query(query).topK(topK).build()
+            );
+
+            List<Document> productResults = results.stream()
+                    .filter(document -> matchesProduct(document, productId))
+                    .toList();
+
+            return joinDocumentTexts(productResults);
+        } catch (Exception ex) {
+            log.error("Failed to search product context from Qdrant for productId={}, query={}", productId, query, ex);
+            return "";
+        }
+    }
+
+    private boolean matchesProduct(Document document, String productId) {
+        if (document == null || document.getMetadata() == null) {
+            return false;
+        }
+        Object metadataProductId = document.getMetadata().get("productId");
+        return metadataProductId != null && productId.equals(String.valueOf(metadataProductId));
+    }
+
+    private String joinDocumentTexts(List<Document> documents) {
+        if (documents == null || documents.isEmpty()) {
+            return "";
+        }
+        return documents.stream()
+                .map(Document::getText)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.joining("\n---\n"));
+    }
+
     private String formatPrice(Object price) {
         if (price == null) {
-            return "khong ro";
+            return "không rõ";
         }
         if (price instanceof Number number) {
             return String.format("%,.0f", number.doubleValue());

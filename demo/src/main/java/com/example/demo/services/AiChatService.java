@@ -1,16 +1,16 @@
 package com.example.demo.services;
 
+import com.example.demo.entities.Chat;
+import com.example.demo.entities.ChatMessage;
 import com.example.demo.entities.Customer;
-import com.example.demo.entities.Discuss;
-import com.example.demo.entities.DiscussionMessage;
 import com.example.demo.entities.User;
-import com.example.demo.entities.enums.DiscussionHandledBy;
-import com.example.demo.entities.enums.DiscussionMessageRole;
+import com.example.demo.entities.enums.ChatHandledBy;
+import com.example.demo.entities.enums.ChatMessageRole;
 import com.example.demo.entities.enums.UserRole;
 import com.example.demo.exceptions.ResourceNotFoundException;
+import com.example.demo.repositories.ChatMessageRepository;
+import com.example.demo.repositories.ChatRepository;
 import com.example.demo.repositories.CustomerRepository;
-import com.example.demo.repositories.DiscussRepository;
-import com.example.demo.repositories.DiscussionMessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -44,22 +44,23 @@ public class AiChatService {
     private final GeminiService geminiService;
     private final AccessControlService accessControlService;
     private final CustomerRepository customerRepository;
-    private final DiscussRepository discussRepository;
-    private final DiscussionMessageRepository discussionMessageRepository;
+    private final ChatRepository chatRepository;
+    private final ChatMessageRepository chatMessageRepository;
 
     @Transactional
     public AiChatResult chatWithBot(String userMessage) {
         log.info("Customer message: {}", userMessage);
 
-        Optional<Discuss> activeStaffSession = findActiveStaffSessionForCurrentCustomer();
+        Optional<Chat> activeStaffSession = findActiveStaffSessionForCurrentCustomer();
         if (activeStaffSession.isPresent()) {
-            appendCustomerMessage(activeStaffSession.get(), userMessage, DiscussionHandledBy.STAFF);
+            appendCustomerMessage(activeStaffSession.get(), userMessage, ChatHandledBy.STAFF);
             return new AiChatResult(STAFF_HANDOFF_MESSAGE, "STAFF");
         }
 
+        // CHAT tổng quát: chỉ dùng ngữ cảnh từ Qdrant.
         String context = qdrantService.searchRelevantContext(userMessage);
         List<Message> history = buildRecentAiHistoryForCurrentCustomer();
-        String botResponse = geminiService.generateAnswer(context, userMessage, history);
+        String botResponse = geminiService.generateChatAnswer(context, userMessage, history);
         saveAiConversationIfCustomer(userMessage, botResponse);
 
         log.info("{} response: {}", BOT_DISPLAY_NAME, botResponse);
@@ -74,13 +75,13 @@ public class AiChatService {
         }
 
         Customer customer = ensureCustomerProfile(currentUser);
-        Discuss discuss = findOpenSupportSessionWithCustomer(customer.getId())
-                .orElseGet(() -> createSupportDiscussion(customer));
+        Chat chat = findOpenSupportSessionWithCustomer(customer.getId())
+                .orElseGet(() -> createSupportChat(customer));
 
         saveMessage(
-                discuss,
-                DiscussionMessageRole.ASSISTANT,
-                DiscussionHandledBy.STAFF,
+                chat,
+                ChatMessageRole.ASSISTANT,
+                ChatHandledBy.STAFF,
                 BOT_DISPLAY_NAME,
                 ESCALATE_CONFIRM_MESSAGE
         );
@@ -89,31 +90,31 @@ public class AiChatService {
     }
 
     @Transactional(readOnly = true)
-    public List<Discuss> getOpenStaffSupportDiscussions() {
+    public List<Chat> getOpenStaffSupportChats() {
         accessControlService.requirePrivilegedRole();
-        return discussRepository.findOpenSupportDiscussionsWithCustomer();
+        return chatRepository.findOpenSupportChatsWithCustomer();
     }
 
     @Transactional(readOnly = true)
-    public List<Discuss> getAllStaffSupportDiscussions() {
+    public List<Chat> getAllStaffSupportChats() {
         accessControlService.requirePrivilegedRole();
-        return discussRepository.findAllSupportDiscussionsWithCustomer();
+        return chatRepository.findAllSupportChatsWithCustomer();
     }
 
     @Transactional(readOnly = true)
-    public Page<Discuss> getStaffSupportDiscussionsPage(String status, Pageable pageable) {
+    public Page<Chat> getStaffSupportChatsPage(String status, Pageable pageable) {
         accessControlService.requirePrivilegedRole();
 
         String normalized = status == null ? "ALL" : status.trim().toUpperCase();
         return switch (normalized) {
-            case "OPEN" -> discussRepository.findOpenSupportDiscussionsPageWithCustomer(pageable);
-            case "CLOSED" -> discussRepository.findClosedSupportDiscussionsPageWithCustomer(pageable);
-            default -> discussRepository.findAllSupportDiscussionsPageWithCustomer(pageable);
+            case "OPEN" -> chatRepository.findOpenSupportChatsPageWithCustomer(pageable);
+            case "CLOSED" -> chatRepository.findClosedSupportChatsPageWithCustomer(pageable);
+            default -> chatRepository.findAllSupportChatsPageWithCustomer(pageable);
         };
     }
 
     @Transactional(readOnly = true)
-    public Optional<Discuss> getMyOpenSupportDiscussion() {
+    public Optional<Chat> getMyOpenSupportChat() {
         User currentUser = accessControlService.getCurrentUserOrThrow();
         if (currentUser.getRole() != UserRole.CUSTOMER) {
             return Optional.empty();
@@ -128,7 +129,7 @@ public class AiChatService {
             return List.of();
         }
 
-        return discussionMessageRepository.findByDiscussCustomerIdOrderByCreatedAtAsc(currentUser.getId()).stream()
+        return chatMessageRepository.findByChatCustomerIdOrderByCreatedAtAsc(currentUser.getId()).stream()
                 .filter(row -> StringUtils.hasText(row.getContent()))
                 .map(row -> new ChatHistoryMessage(
                         row.getId(),
@@ -141,36 +142,36 @@ public class AiChatService {
     }
 
     @Transactional
-    public void replySupportDiscussion(String discussionId, String message) {
+    public void replySupportChat(String chatId, String message) {
         accessControlService.requirePrivilegedRole();
         if (!StringUtils.hasText(message)) {
             throw new IllegalArgumentException("Message is required");
         }
 
-        Discuss discuss = discussRepository.findById(discussionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Discussion not found: " + discussionId));
-        if (discuss.getEndDate() != null) {
-            throw new IllegalStateException("This support discussion is already closed");
+        Chat chat = chatRepository.findById(chatId)
+                .orElseThrow(() -> new ResourceNotFoundException("Chat not found: " + chatId));
+        if (chat.getEndDate() != null) {
+            throw new IllegalStateException("This support chat is already closed");
         }
 
         User staff = accessControlService.getCurrentUserOrThrow();
         String staffName = StringUtils.hasText(staff.getFullName()) ? staff.getFullName() : staff.getUsername();
         saveMessage(
-                discuss,
-                DiscussionMessageRole.ASSISTANT,
-                DiscussionHandledBy.STAFF,
+                chat,
+                ChatMessageRole.ASSISTANT,
+                ChatHandledBy.STAFF,
                 staffName,
                 message.trim()
         );
     }
 
     @Transactional
-    public void closeSupportDiscussion(String discussionId) {
+    public void closeSupportChat(String chatId) {
         accessControlService.requirePrivilegedRole();
 
-        Discuss discuss = discussRepository.findById(discussionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Discussion not found: " + discussionId));
-        if (discuss.getEndDate() != null) {
+        Chat chat = chatRepository.findById(chatId)
+                .orElseThrow(() -> new ResourceNotFoundException("Chat not found: " + chatId));
+        if (chat.getEndDate() != null) {
             return;
         }
 
@@ -178,24 +179,24 @@ public class AiChatService {
         String staffName = StringUtils.hasText(staff.getFullName()) ? staff.getFullName() : staff.getUsername();
 
         saveMessage(
-                discuss,
-                DiscussionMessageRole.SYSTEM,
-                DiscussionHandledBy.STAFF,
+                chat,
+                ChatMessageRole.SYSTEM,
+                ChatHandledBy.STAFF,
                 "System",
                 "Support closed by staff (" + staffName + ")"
         );
 
-        discuss.setEndDate(new Date());
-        discussRepository.save(discuss);
+        chat.setEndDate(new Date());
+        chatRepository.save(chat);
     }
 
     @Transactional(readOnly = true)
-    public String buildDiscussionContentLog(Discuss discuss) {
-        if (discuss == null || !StringUtils.hasText(discuss.getId())) {
+    public String buildChatContentLog(Chat chat) {
+        if (chat == null || !StringUtils.hasText(chat.getId())) {
             return "";
         }
 
-        List<DiscussionMessage> messages = discussionMessageRepository.findByDiscussIdOrderByCreatedAtAsc(discuss.getId());
+        List<ChatMessage> messages = chatMessageRepository.findByChatIdOrderByCreatedAtAsc(chat.getId());
         return messages.stream()
                 .filter(message -> StringUtils.hasText(message.getContent()))
                 .map(this::formatSupportLogLine)
@@ -210,8 +211,8 @@ public class AiChatService {
                 return List.of();
             }
 
-            List<DiscussionMessage> latestRows =
-                    discussionMessageRepository.findByDiscussCustomerIdAndDiscussIsAiHandledTrueOrderByCreatedAtDesc(
+            List<ChatMessage> latestRows =
+                    chatMessageRepository.findByChatCustomerIdAndChatIsAiHandledTrueOrderByCreatedAtDesc(
                             currentUser.getId(),
                             PageRequest.of(0, 10)
                     );
@@ -222,13 +223,13 @@ public class AiChatService {
             Collections.reverse(latestRows);
 
             List<Message> history = new ArrayList<>();
-            for (DiscussionMessage row : latestRows) {
+            for (ChatMessage row : latestRows) {
                 if (!StringUtils.hasText(row.getContent())) {
                     continue;
                 }
-                if (row.getRole() == DiscussionMessageRole.USER) {
+                if (row.getRole() == ChatMessageRole.USER) {
                     history.add(new UserMessage(row.getContent()));
-                } else if (row.getRole() == DiscussionMessageRole.ASSISTANT) {
+                } else if (row.getRole() == ChatMessageRole.ASSISTANT) {
                     history.add(new AssistantMessage(row.getContent()));
                 }
             }
@@ -248,19 +249,19 @@ public class AiChatService {
         Customer customer = ensureCustomerProfile(currentUser);
 
         Date now = new Date();
-        Discuss discuss = Discuss.builder()
+        Chat chat = Chat.builder()
                 .startDate(now)
                 .endDate(now)
                 .isAiHandled(true)
                 .customer(customer)
                 .build();
-        Discuss saved = discussRepository.saveAndFlush(discuss);
+        Chat saved = chatRepository.saveAndFlush(chat);
 
-        saveMessage(saved, DiscussionMessageRole.USER, DiscussionHandledBy.AI, "Customer", userMessage);
-        saveMessage(saved, DiscussionMessageRole.ASSISTANT, DiscussionHandledBy.AI, BOT_DISPLAY_NAME, botResponse);
+        saveMessage(saved, ChatMessageRole.USER, ChatHandledBy.AI, "Customer", userMessage);
+        saveMessage(saved, ChatMessageRole.ASSISTANT, ChatHandledBy.AI, BOT_DISPLAY_NAME, botResponse);
     }
 
-    private Optional<Discuss> findActiveStaffSessionForCurrentCustomer() {
+    private Optional<Chat> findActiveStaffSessionForCurrentCustomer() {
         try {
             User currentUser = accessControlService.getCurrentUserOrThrow();
             if (currentUser.getRole() != UserRole.CUSTOMER) {
@@ -273,49 +274,49 @@ public class AiChatService {
         }
     }
 
-    private Optional<Discuss> findOpenSupportSessionWithCustomer(String customerId) {
-        return discussRepository.findFirstByCustomerIdAndIsAiHandledFalseAndEndDateIsNullOrderByStartDateDesc(customerId);
+    private Optional<Chat> findOpenSupportSessionWithCustomer(String customerId) {
+        return chatRepository.findFirstByCustomerIdAndIsAiHandledFalseAndEndDateIsNullOrderByStartDateDesc(customerId);
     }
 
-    private Discuss createSupportDiscussion(Customer customer) {
-        Discuss discuss = Discuss.builder()
+    private Chat createSupportChat(Customer customer) {
+        Chat chat = Chat.builder()
                 .startDate(new Date())
                 .isAiHandled(false)
                 .customer(customer)
                 .build();
-        return discussRepository.saveAndFlush(discuss);
+        return chatRepository.saveAndFlush(chat);
     }
 
-    private void appendCustomerMessage(Discuss discuss, String message, DiscussionHandledBy handledBy) {
-        saveMessage(discuss, DiscussionMessageRole.USER, handledBy, "Customer", message);
+    private void appendCustomerMessage(Chat chat, String message, ChatHandledBy handledBy) {
+        saveMessage(chat, ChatMessageRole.USER, handledBy, "Customer", message);
     }
 
-    private void saveMessage(Discuss discuss,
-                             DiscussionMessageRole role,
-                             DiscussionHandledBy handledBy,
+    private void saveMessage(Chat chat,
+                             ChatMessageRole role,
+                             ChatHandledBy handledBy,
                              String senderName,
                              String content) {
-        if (discuss == null || !StringUtils.hasText(content)) {
+        if (chat == null || !StringUtils.hasText(content)) {
             return;
         }
 
-        DiscussionMessage row = DiscussionMessage.builder()
-                .discuss(discuss)
+        ChatMessage row = ChatMessage.builder()
+                .chat(chat)
                 .role(role)
                 .handledBy(handledBy)
                 .senderName(senderName)
                 .content(content.trim())
                 .build();
-        discussionMessageRepository.saveAndFlush(row);
+        chatMessageRepository.saveAndFlush(row);
     }
 
-    private String formatSupportLogLine(DiscussionMessage message) {
+    private String formatSupportLogLine(ChatMessage message) {
         String content = message.getContent().trim();
-        if (message.getRole() == DiscussionMessageRole.USER) {
+        if (message.getRole() == ChatMessageRole.USER) {
             return "Customer: " + content;
         }
-        if (message.getRole() == DiscussionMessageRole.ASSISTANT) {
-            if (message.getHandledBy() == DiscussionHandledBy.STAFF) {
+        if (message.getRole() == ChatMessageRole.ASSISTANT) {
+            if (message.getHandledBy() == ChatHandledBy.STAFF) {
                 String sender = StringUtils.hasText(message.getSenderName()) ? message.getSenderName() : STAFF_DISPLAY_NAME;
                 return "Staff (" + sender + "): " + content;
             }
@@ -334,7 +335,7 @@ public class AiChatService {
                 });
     }
 
-    private String toRoleValue(DiscussionMessageRole role) {
+    private String toRoleValue(ChatMessageRole role) {
         if (role == null) {
             return "assistant";
         }
