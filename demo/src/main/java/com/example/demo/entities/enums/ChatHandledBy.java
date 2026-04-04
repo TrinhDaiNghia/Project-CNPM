@@ -1,6 +1,6 @@
 package com.example.demo.entities.enums;
 
-public enum DiscussionHandledBy {
+public enum ChatHandledBy {
     AI,
     STAFF
 }

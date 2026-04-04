@@ -1,4 +1,4 @@
-package com.example.demo.entities;
+﻿package com.example.demo.entities;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
@@ -11,13 +11,13 @@ import java.util.Date;
 import java.util.List;
 
 @Entity
-@Table(name = "discussions")
+@Table(name = "chats")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Discuss {
+public class Chat {
 
     @Id
     @UuidGenerator
@@ -33,15 +33,10 @@ public class Discuss {
     @Column(name = "end_date")
     private Date endDate;
 
-    @Min(value = 0, message = "Score must not be negative")
-    @Max(value = 10, message = "Score must not exceed 10")
-    @Column(name = "score_sent")
-    private Integer scoreSent;
-
-    @OneToMany(mappedBy = "discuss", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "chat", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonIgnore
     @Builder.Default
-    private List<DiscussionMessage> messages = new ArrayList<>();
+    private List<ChatMessage> messages = new ArrayList<>();
 
     @Column(name = "is_ai_handled", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
     @Builder.Default
@@ -61,3 +56,4 @@ public class Discuss {
         this.startDate = startTime;
     }
 }
+

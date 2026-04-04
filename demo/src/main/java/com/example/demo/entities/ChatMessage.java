@@ -1,7 +1,7 @@
 package com.example.demo.entities;
 
-import com.example.demo.entities.enums.DiscussionHandledBy;
-import com.example.demo.entities.enums.DiscussionMessageRole;
+import com.example.demo.entities.enums.ChatHandledBy;
+import com.example.demo.entities.enums.ChatMessageRole;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -27,13 +27,13 @@ import jakarta.validation.constraints.NotNull;
 import java.util.Date;
 
 @Entity
-@Table(name = "discussion_messages")
+@Table(name = "chat_messages")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class DiscussionMessage {
+public class ChatMessage {
 
     @Id
     @UuidGenerator
@@ -42,19 +42,19 @@ public class DiscussionMessage {
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "discussion_id", nullable = false)
+    @JoinColumn(name = "chat_id", nullable = false)
     @JsonIgnore
-    private Discuss discuss;
+    private Chat chat;
 
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
-    private DiscussionMessageRole role;
+    private ChatMessageRole role;
 
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "handled_by", nullable = false, length = 20)
-    private DiscussionHandledBy handledBy;
+    private ChatHandledBy handledBy;
 
     @Column(name = "sender_name", length = 120)
     private String senderName;

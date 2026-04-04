@@ -1,6 +1,6 @@
 package com.example.demo.entities.enums;
 
-public enum DiscussionMessageRole {
+public enum ChatMessageRole {
     USER,
     ASSISTANT,
     SYSTEM
