@@ -3,6 +3,7 @@ package com.example.demo.services;
 import com.example.demo.dtos.response.NotificationResponse;
 import com.example.demo.entities.Notification;
 import com.example.demo.entities.User;
+import com.example.demo.entities.enums.NotificationType;
 import com.example.demo.entities.enums.UserRole;
 import com.example.demo.exceptions.ResourceNotFoundException;
 import com.example.demo.repositories.NotificationRepository;
@@ -23,14 +24,14 @@ import java.util.List;
 @Transactional
 public class NotificationService {
 
-    private static final String REGISTRATION_SUCCESS_TITLE = "Đăng ký thành công";
-    private static final String PASSWORD_RESET_SUCCESS_TITLE = "Đặt lại mật khẩu thành công";
-    private static final String ORDER_SUCCESS_TITLE = "Đặt hàng thành công";
-    private static final String NEW_ORDER_TO_STORE_TITLE = "Có đơn hàng mới";
-    private static final String ORDER_CONFIRMED_TITLE = "Đơn hàng đã được xác nhận";
-    private static final String ORDER_CANCELLED_BY_STORE_TITLE = "Đơn hàng đã bị hủy bởi cửa hàng";
-    private static final String ORDER_DELIVERED_TITLE = "Đơn hàng đã được giao";
-    private static final String ORDER_STATUS_UPDATE_TITLE = "Cập nhật trạng thái đơn hàng";
+    private static final String REGISTRATION_SUCCESS_TITLE = "Dang ky thanh cong";
+    private static final String PASSWORD_RESET_SUCCESS_TITLE = "Dat lai mat khau thanh cong";
+    private static final String ORDER_SUCCESS_TITLE = "Dat hang thanh cong";
+    private static final String NEW_ORDER_TO_STORE_TITLE = "Co don hang moi";
+    private static final String ORDER_CONFIRMED_TITLE = "Don hang da duoc xac nhan";
+    private static final String ORDER_CANCELLED_BY_STORE_TITLE = "Don hang da bi huy boi cua hang";
+    private static final String ORDER_DELIVERED_TITLE = "Don hang da duoc giao";
+    private static final String ORDER_STATUS_UPDATE_TITLE = "Cap nhat trang thai don hang";
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
@@ -96,12 +97,12 @@ public class NotificationService {
         User receiver = requireUser(registeredUser.getId());
         User sender = getSystemSender();
 
-        String content = "Chào " + receiver.getUsername()
-                + ", tài khoản của bạn đã được tạo thành công.";
+        String content = "Chao " + receiver.getUsername() + ", tai khoan cua ban da duoc tao thanh cong.";
 
         Notification notification = Notification.builder()
                 .title(REGISTRATION_SUCCESS_TITLE)
                 .content(content)
+                .type(NotificationType.SYSTEM)
                 .directUrl("/profile")
                 .sender(sender)
                 .receiver(receiver)
@@ -122,19 +123,23 @@ public class NotificationService {
         User sender = getPrivilegedSender(senderId);
         User receiver = requireUser(user.getId());
 
-        String content = "Chào " + receiver.getUsername()
-                + ", mật khẩu của bạn đã được đặt lại thành công. Vui lòng đăng nhập lại với mật khẩu mới.";
+        String content = "Chao " + receiver.getUsername() + ", mat khau cua ban da duoc dat lai thanh cong.";
 
         Notification notification = Notification.builder()
                 .title(PASSWORD_RESET_SUCCESS_TITLE)
                 .content(content)
-                .directUrl("/login")
+                .type(NotificationType.SYSTEM)
+                .directUrl("/auth/login")
                 .sender(sender)
                 .receiver(receiver)
                 .expiry(Date.from(Instant.now().plus(30, ChronoUnit.DAYS)))
                 .build();
 
         notificationRepository.save(notification);
+    }
+
+    public void sendPasswordResetSuccessNotification(User user) {
+        sendPasswordResetSuccessNotification(getSystemSender().getId(), user);
     }
 
     public void sendOrderSuccessNotification(String senderId, User customer, String orderId) {
@@ -148,12 +153,12 @@ public class NotificationService {
         User sender = getPrivilegedSender(senderId);
         User receiver = requireUser(customer.getId());
 
-        String content = "Chào " + receiver.getUsername()
-                + ", đơn hàng " + orderId + " đã được đặt thành công.";
+        String content = "Chao " + receiver.getUsername() + ", don hang " + orderId + " da duoc dat thanh cong.";
 
         Notification notification = Notification.builder()
                 .title(ORDER_SUCCESS_TITLE)
                 .content(content)
+                .type(NotificationType.ORDER)
                 .directUrl("/orders/" + orderId)
                 .sender(sender)
                 .receiver(receiver)
@@ -161,6 +166,10 @@ public class NotificationService {
                 .build();
 
         notificationRepository.save(notification);
+    }
+
+    public void sendOrderSuccessNotification(User customer, String orderId) {
+        sendOrderSuccessNotification(getSystemSender().getId(), customer, orderId);
     }
 
     public void sendNewOrderToStoreNotification(String senderId, User store, String orderId) {
@@ -174,13 +183,13 @@ public class NotificationService {
         User sender = requireUser(senderId);
         User receiver = requireUser(store.getId());
 
-        String content = "Chào " + receiver.getUsername()
-                + ", bạn có một đơn hàng mới với mã " + orderId + ".";
+        String content = "Chao " + receiver.getUsername() + ", ban co mot don hang moi voi ma " + orderId + ".";
 
         Notification notification = Notification.builder()
                 .title(NEW_ORDER_TO_STORE_TITLE)
                 .content(content)
-                .directUrl("/admin/orders/" + orderId)
+                .type(NotificationType.ORDER)
+                .directUrl("/staff/orders/" + orderId)
                 .sender(sender)
                 .receiver(receiver)
                 .expiry(Date.from(Instant.now().plus(30, ChronoUnit.DAYS)))
@@ -203,12 +212,12 @@ public class NotificationService {
         User sender = getPrivilegedSender(senderId);
         User receiver = requireUser(customer.getId());
 
-        String content = "Chào " + receiver.getUsername()
-                + ", đơn hàng " + orderId + " đã được cập nhật trạng thái: " + newStatus + ".";
+        String content = "Chao " + receiver.getUsername() + ", don hang " + orderId + " da duoc cap nhat trang thai: " + newStatus + ".";
 
         Notification notification = Notification.builder()
                 .title(title)
                 .content(content)
+                .type(NotificationType.ORDER)
                 .directUrl("/orders/" + orderId)
                 .sender(sender)
                 .receiver(receiver)
@@ -219,33 +228,52 @@ public class NotificationService {
     }
 
     public void sendOrderConfirmedNotification(String senderId, User customer, String orderId) {
-        sendOrderStatusUpdateNotification(senderId, customer, orderId, ORDER_CONFIRMED_TITLE, "Đã được xác nhận");
+        sendOrderStatusUpdateNotification(senderId, customer, orderId, ORDER_CONFIRMED_TITLE, "DA_XAC_NHAN");
     }
 
     public void sendOrderCancelledByStoreNotification(String senderId, User customer, String orderId) {
-        sendOrderStatusUpdateNotification(senderId, customer, orderId, ORDER_CANCELLED_BY_STORE_TITLE, "Đã bị hủy bởi cửa hàng");
+        sendOrderStatusUpdateNotification(senderId, customer, orderId, ORDER_CANCELLED_BY_STORE_TITLE, "DA_HUY");
     }
 
     public void sendOrderDeliveredNotification(String senderId, User customer, String orderId) {
-        sendOrderStatusUpdateNotification(senderId, customer, orderId, ORDER_DELIVERED_TITLE, "Đã được giao");
+        sendOrderStatusUpdateNotification(senderId, customer, orderId, ORDER_DELIVERED_TITLE, "DA_GIAO");
     }
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> getMyNotifications(String userId) {
+        return getMyNotifications(userId, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<NotificationResponse> getMyNotifications(String userId, Boolean isRead, NotificationType type) {
         if (!StringUtils.hasText(userId)) {
             throw new IllegalArgumentException("userId is required");
         }
 
         accessControlService.requireUserSelfOrPrivileged(userId);
 
-        return notificationRepository.findByReceiverIdOrderByTimeCreatedDesc(userId).stream()
-                .map(this::toResponse)
-                .toList();
+        List<Notification> notifications;
+        if (isRead != null && type != null) {
+            notifications = notificationRepository.findByReceiverIdAndReadAndTypeOrderByTimeCreatedDesc(userId, isRead, type);
+        } else if (isRead != null) {
+            notifications = notificationRepository.findByReceiverIdAndReadOrderByTimeCreatedDesc(userId, isRead);
+        } else if (type != null) {
+            notifications = notificationRepository.findByReceiverIdAndTypeOrderByTimeCreatedDesc(userId, type);
+        } else {
+            notifications = notificationRepository.findByReceiverIdOrderByTimeCreatedDesc(userId);
+        }
+
+        return notifications.stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> getNotificationsByUserId(String userId) {
-        return getMyNotifications(userId);
+        return getMyNotifications(userId, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<NotificationResponse> getNotificationsByUserId(String userId, Boolean isRead, NotificationType type) {
+        return getMyNotifications(userId, isRead, type);
     }
 
     public void markAsRead(String userId, String notificationId) {
@@ -263,6 +291,7 @@ public class NotificationService {
 
         if (!notification.isRead()) {
             notification.setRead(true);
+            notification.setReadAt(Date.from(Instant.now()));
             notificationRepository.save(notification);
         }
     }
@@ -273,7 +302,31 @@ public class NotificationService {
         }
 
         accessControlService.requireUserSelfOrPrivileged(userId);
-        return notificationRepository.markAllAsReadByReceiverId(userId);
+        return notificationRepository.markAllAsReadByReceiverId(userId, Date.from(Instant.now()));
+    }
+
+    public void deleteNotification(String userId, String notificationId) {
+        if (!StringUtils.hasText(userId)) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        if (!StringUtils.hasText(notificationId)) {
+            throw new IllegalArgumentException("notificationId is required");
+        }
+
+        accessControlService.requireUserSelfOrPrivileged(userId);
+        int affectedRows = notificationRepository.deleteByIdAndReceiverId(notificationId, userId);
+        if (affectedRows == 0) {
+            throw new ResourceNotFoundException("Notification not found: " + notificationId);
+        }
+    }
+
+    public int clearAllNotifications(String userId) {
+        if (!StringUtils.hasText(userId)) {
+            throw new IllegalArgumentException("userId is required");
+        }
+
+        accessControlService.requireUserSelfOrPrivileged(userId);
+        return notificationRepository.deleteAllByReceiverId(userId);
     }
 
     private NotificationResponse toResponse(Notification notification) {
@@ -282,7 +335,9 @@ public class NotificationService {
                 .title(notification.getTitle())
                 .content(notification.getContent())
                 .directUrl(notification.getDirectUrl())
+                .type(notification.getType())
                 .isRead(notification.isRead())
+                .readAt(notification.getReadAt())
                 .timeCreated(notification.getTimeCreated())
                 .expiry(notification.getExpiry())
                 .senderId(notification.getSender() != null ? notification.getSender().getId() : null)
@@ -290,4 +345,3 @@ public class NotificationService {
                 .build();
     }
 }
-

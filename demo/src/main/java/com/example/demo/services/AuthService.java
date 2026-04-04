@@ -13,6 +13,7 @@ import com.example.demo.entities.enums.UserRole;
 import com.example.demo.repositories.UserRepository;
 import com.example.demo.repositories.CustomerRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional
 public class AuthService {
@@ -151,6 +153,11 @@ public class AuthService {
         User user = optionalUser.get();
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+        try {
+            notificationService.sendPasswordResetSuccessNotification(user);
+        } catch (Exception ex) {
+            log.warn("Password reset notification failed for user {}", user.getId(), ex);
+        }
         return true;
     }
 
