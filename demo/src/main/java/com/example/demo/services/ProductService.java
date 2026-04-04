@@ -42,6 +42,7 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
     private final AccessControlService accessControlService;
     private final CloudinaryService cloudinaryService;
+    private final QdrantService qdrantService;
 
     public ProductResponse createProduct(ProductCreateRequest request) {
         accessControlService.requirePrivilegedRole();
@@ -59,7 +60,9 @@ public class ProductService {
 
         Product product = new Product();
         applyProductRequest(product, request, primaryCategory, categories);
-        return toProductResponse(productRepository.save(product));
+        Product savedProduct = productRepository.save(product);
+        qdrantService.upsertProduct(savedProduct);
+        return toProductResponse(savedProduct);
     }
 
     public ProductResponse updateProduct(String id, ProductUpdateRequest request) {
@@ -85,7 +88,9 @@ public class ProductService {
         }
 
         applyProductRequest(existing, request, primaryCategory, categories);
-        return toProductResponse(productRepository.save(existing));
+        Product updatedProduct = productRepository.save(existing);
+        qdrantService.upsertProduct(updatedProduct);
+        return toProductResponse(updatedProduct);
     }
 
     public void deleteProduct(String id) {
@@ -98,6 +103,7 @@ public class ProductService {
         }
 
         productRepository.delete(existing);
+        qdrantService.deleteProduct(id);
     }
 
     public ProductImageResponse uploadProductImage(String productId,

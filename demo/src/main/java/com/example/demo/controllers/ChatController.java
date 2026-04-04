@@ -4,11 +4,15 @@ import com.example.demo.dtos.request.ChatRequest;
 import com.example.demo.dtos.request.SupportReplyRequest;
 import com.example.demo.dtos.response.ChatResponse;
 import com.example.demo.dtos.response.ChatHistoryMessageResponse;
+import com.example.demo.dtos.response.PageResponse;
 import com.example.demo.dtos.response.SupportDiscussionResponse;
 import com.example.demo.entities.Discuss;
 import com.example.demo.services.AiChatService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
@@ -76,11 +81,27 @@ public class ChatController {
     }
 
     @GetMapping("/support/all")
-    public ResponseEntity<List<SupportDiscussionResponse>> getAllSupportDiscussions() {
-        List<SupportDiscussionResponse> data = aiChatService.getAllStaffSupportDiscussions().stream()
+    public ResponseEntity<PageResponse<SupportDiscussionResponse>> getAllSupportDiscussions(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "6") int pageSize,
+            @RequestParam(defaultValue = "ALL") String status
+    ) {
+        int safePage = Math.max(1, page);
+        int safePageSize = Math.max(1, pageSize);
+        Pageable pageable = PageRequest.of(safePage - 1, safePageSize);
+
+        Page<Discuss> result = aiChatService.getStaffSupportDiscussionsPage(status, pageable);
+        List<SupportDiscussionResponse> items = result.getContent().stream()
                 .map(this::toSupportResponse)
                 .toList();
-        return ResponseEntity.ok(data);
+        PageResponse<SupportDiscussionResponse> response = PageResponse.<SupportDiscussionResponse>builder()
+                .items(items)
+                .page(safePage)
+                .pageSize(safePageSize)
+                .total(result.getTotalElements())
+                .totalPages(result.getTotalPages())
+                .build();
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/support/my-active")
@@ -115,7 +136,7 @@ public class ChatController {
                 .customerName(customerName)
                 .startDate(discuss.getStartDate())
                 .endDate(discuss.getEndDate())
-                .contentLog(discuss.getContentLog())
+                .contentLog(aiChatService.buildDiscussionContentLog(discuss))
                 .aiHandled(discuss.getIsAiHandled())
                 .build();
     }

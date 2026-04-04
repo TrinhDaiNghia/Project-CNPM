@@ -6,7 +6,9 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 import org.hibernate.annotations.UuidGenerator;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 @Entity
 @Table(name = "discussions")
@@ -36,8 +38,10 @@ public class Discuss {
     @Column(name = "score_sent")
     private Integer scoreSent;
 
-    @Column(name = "content_log", columnDefinition = "TEXT")
-    private String contentLog;
+    @OneToMany(mappedBy = "discuss", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    @Builder.Default
+    private List<DiscussionMessage> messages = new ArrayList<>();
 
     @Column(name = "is_ai_handled", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
     @Builder.Default

@@ -8,6 +8,7 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -29,28 +30,44 @@ public class QdrantService {
     public void upsertProduct(Product product) {
         try {
             String safePrice = formatPrice(product.getPrice());
+            // Tạo chuỗi nội dung cực kỳ chi tiết bao gồm tất cả thuộc tính
             String content = String.format(
-                "Dong ho: %s. Thuong hieu: %s. Gia: %s VND. Chat lieu: %s. Mo ta: %s",
-                product.getName(),
-                product.getBrand(),
-                safePrice,
-                product.getWireMaterial(),
-                product.getDescription()
+                    "Sản phẩm: %s. Thương hiệu: %s. Trạng thái: %s. Số lượng còn lại trong kho: %d. " +
+                            "Giá bán: %s VND. Loại máy: %s. Mặt kính: %s. Kháng nước: %s. Kích thước mặt: %s. " +
+                            "Chất liệu dây: %s. Màu dây: %s. Màu vỏ: %s. Màu mặt: %s. " +
+                            "Mô tả chi tiết: %s",
+                    product.getName(),
+                    product.getBrand(),
+                    product.getStatus() != null ? product.getStatus().name() : "Đang bán",
+                    product.getStockQuantity(), // Quan trọng: Thêm số lượng tồn kho vào đây
+                    safePrice,
+                    product.getMovementType(),
+                    product.getGlassMaterial(),
+                    product.getWaterResistance(),
+                    product.getFaceSize(),
+                    product.getWireMaterial(),
+                    product.getWireColor(),
+                    product.getCaseColor(),
+                    product.getFaceColor(),
+                    product.getDescription()
             );
 
             Document document = new Document(
-                product.getId(),
-                content,
-                Map.of(
-                    "productId", product.getId(),
-                    "brand", product.getBrand(),
-                    "price", product.getPrice()
-                )
+                    product.getId(),
+                    content,
+                    Map.of(
+                            "productId", product.getId(),
+                            "brand", product.getBrand(),
+                            "price", product.getPrice(),
+                            "stock", product.getStockQuantity(), // Thêm vào metadata để lọc nếu cần
+                            "status", product.getStatus() != null ? product.getStatus().name() : "ACTIVE"
+                    )
             );
 
             vectorStore.add(List.of(document));
+            log.info("Successfully synced product {} to Qdrant with stock: {}", product.getId(), product.getStockQuantity());
         } catch (Exception ex) {
-            log.error("Failed to upsert product {} to Qdrant", product != null ? product.getId() : "null", ex);
+            log.error("Failed to upsert product {} to Qdrant", product.getId(), ex);
         }
     }
 
@@ -77,6 +94,7 @@ public class QdrantService {
 
             return results.stream()
                 .map(Document::getText)
+                .filter(StringUtils::hasText)
                 .collect(Collectors.joining("\n---\n"));
         } catch (Exception ex) {
             log.error("Failed to search context from Qdrant for query: {}", query, ex);
