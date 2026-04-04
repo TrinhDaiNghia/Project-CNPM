@@ -1,1 +1,0 @@
-ALTER TABLE warranties MODIFY customer_id VARCHAR(36) NULL;
