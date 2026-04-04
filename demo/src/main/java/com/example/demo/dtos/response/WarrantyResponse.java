@@ -11,11 +11,17 @@ import java.util.Date;
 public class WarrantyResponse {
 
     private String id;
+    private String userId;
+    private String customerId;
+    private String orderId;
+    private String orderItemId;
     private String customerPhone;
     private String customerName;
     private String issueDescription;
     private Date receivedDate;
     private Date expectedReturnDate;
+    private Date createdAt;
+    private Date updatedAt;
     private WarrantyStatus status;
     private String technicianNote;
     private String rejectReason;

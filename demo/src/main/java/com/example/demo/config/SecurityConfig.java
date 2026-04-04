@@ -48,6 +48,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/customers/**").hasAnyRole("STAFF", "OWNER", "CUSTOMER")
                         .requestMatchers(HttpMethod.DELETE, "/api/customers/**").hasAnyRole("STAFF", "OWNER")
 
+                        .requestMatchers(HttpMethod.GET, "/api/warranties/customer").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.POST, "/api/warranties/customer/**").hasRole("CUSTOMER")
+
                         .requestMatchers("/api/suppliers/**").hasRole("OWNER")
                         .requestMatchers("/api/import-receipts/**").hasRole("OWNER")
                         .requestMatchers("/api/warranties/**").hasAnyRole("STAFF", "OWNER")

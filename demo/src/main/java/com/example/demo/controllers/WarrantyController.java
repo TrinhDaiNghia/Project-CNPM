@@ -1,5 +1,6 @@
 package com.example.demo.controllers;
 
+import com.example.demo.dtos.request.CustomerWarrantyRequest;
 import com.example.demo.dtos.request.WarrantyProcessRequest;
 import com.example.demo.dtos.request.WarrantyRequest;
 import com.example.demo.dtos.request.WarrantySearchRequest;
@@ -43,6 +44,12 @@ public class WarrantyController {
         return ResponseEntity.ok(warrantyService.searchWarrantyRequests(request, pageable));
     }
 
+    @GetMapping("/customer")
+    public ResponseEntity<Page<WarrantyResponse>> getMyWarranties(
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(warrantyService.getMyWarrantyRequests(pageable));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<WarrantyResponse> getById(@PathVariable String id) {
         return warrantyService.getWarrantyRequestDetail(id)
@@ -53,6 +60,11 @@ public class WarrantyController {
     @PostMapping("/create")
     public ResponseEntity<WarrantyResponse> create(@Valid @RequestBody WarrantyRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(warrantyService.createWarrantyRequest(request));
+    }
+
+    @PostMapping("/customer/create")
+    public ResponseEntity<WarrantyResponse> createForCustomer(@Valid @RequestBody CustomerWarrantyRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(warrantyService.createCustomerWarrantyRequest(request));
     }
 
     @PatchMapping("/{id}/status")

@@ -17,6 +17,8 @@ public interface WarrantyRepository extends JpaRepository<Warranty, String> {
 
     Page<Warranty> findByStatus(WarrantyStatus status, Pageable pageable);
 
+    Page<Warranty> findByUserIdOrderByCreatedAtDesc(String userId, Pageable pageable);
+
     @Query("SELECT w FROM Warranty w " +
             "WHERE (:keyword IS NULL OR LOWER(w.customerName) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
             "OR LOWER(w.customerPhone) LIKE LOWER(CONCAT('%', :keyword, '%')) " +

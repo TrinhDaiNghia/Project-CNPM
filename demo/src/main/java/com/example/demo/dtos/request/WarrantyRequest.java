@@ -20,6 +20,8 @@ public class WarrantyRequest {
     @Size(max = 100)
     private String customerName;
 
+    private String customerId;
+
     @NotBlank(message = "Issue description is required")
     @Size(max = 1000)
     private String issueDescription;
