@@ -42,8 +42,10 @@ public class CartController {
     }
 
     @DeleteMapping("/{customerId}/clear")
-    public ResponseEntity<Void> clearCart(@PathVariable String customerId) {
-        cartService.clearCart(customerId);
+    public ResponseEntity<Void> clearCart(
+            @PathVariable String customerId,
+            @RequestParam(defaultValue = "true") boolean restock) {
+        cartService.clearCart(customerId, restock);
         return ResponseEntity.noContent().build();
     }
 }

@@ -49,22 +49,28 @@ public class CartService {
 
     public CartResponse addItem(String customerId, String productId, int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("Quantity must be greater than 0");
+            throw new IllegalArgumentException("Số lượng phải lớn hơn 0");
         }
 
         Cart cart = getOrCreateCartEntity(customerId);
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
 
+        int availableStock = stockOf(product);
+        if (quantity > availableStock) {
+            throw new IllegalArgumentException("Số lượng vượt quá tồn kho");
+        }
+
         cart.getItems().stream()
-                .filter(item -> item.getProduct().getId().equals(productId))
+                .filter(item -> item.getProduct() != null && item.getProduct().getId().equals(productId))
                 .findFirst()
                 .ifPresentOrElse(
                         item -> {
                             int current = item.getQuantity() == null ? 0 : item.getQuantity();
                             int nextQuantity = current + quantity;
+                            long price = item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice();
                             item.setQuantity(nextQuantity);
-                            item.setSubTotal((item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice()) * nextQuantity);
+                            item.setSubTotal(price * nextQuantity);
                         },
                         () -> cart.getItems().add(
                                 CartItem.builder()
@@ -76,6 +82,7 @@ public class CartService {
                         )
                 );
 
+        product.setStockQuantity(availableStock - quantity);
         recalcTotal(cart);
         return toResponse(cartRepository.save(cart));
     }
@@ -90,14 +97,32 @@ public class CartService {
             return removeItem(customerId, productId);
         }
 
-        cart.getItems().stream()
-                .filter(item -> item.getProduct().getId().equals(productId))
+        CartItem item = cart.getItems().stream()
+                .filter(cartItem -> cartItem.getProduct() != null && cartItem.getProduct().getId().equals(productId))
                 .findFirst()
-                .ifPresent(item -> {
-                    item.setQuantity(quantity);
-                    long price = item.getProduct() == null || item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice();
-                    item.setSubTotal(price * quantity);
-                });
+                .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm không tồn tại trong giỏ hàng: " + productId));
+
+        Product product = item.getProduct();
+        if (product == null) {
+            throw new ResourceNotFoundException("Product not found: " + productId);
+        }
+
+        int currentQuantity = item.getQuantity() == null ? 0 : item.getQuantity();
+        int delta = quantity - currentQuantity;
+        int availableStock = stockOf(product);
+
+        if (delta > 0) {
+            if (delta > availableStock) {
+                throw new IllegalArgumentException("Số lượng vượt quá tồn kho");
+            }
+            product.setStockQuantity(availableStock - delta);
+        } else if (delta < 0) {
+            product.setStockQuantity(availableStock + Math.abs(delta));
+        }
+
+        long price = product.getPrice() == null ? 0L : product.getPrice();
+        item.setQuantity(quantity);
+        item.setSubTotal(price * quantity);
 
         recalcTotal(cart);
         return toResponse(cartRepository.save(cart));
@@ -109,7 +134,18 @@ public class CartService {
 
     public CartResponse removeItem(String customerId, String productId) {
         Cart cart = getOrCreateCartEntity(customerId);
-        cart.getItems().removeIf(item -> item.getProduct().getId().equals(productId));
+        CartItem target = cart.getItems().stream()
+                .filter(item -> item.getProduct() != null && item.getProduct().getId().equals(productId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm không tồn tại trong giỏ hàng: " + productId));
+
+        Product product = target.getProduct();
+        int quantity = target.getQuantity() == null ? 0 : target.getQuantity();
+        if (product != null) {
+            product.setStockQuantity(stockOf(product) + quantity);
+        }
+
+        cart.getItems().remove(target);
         recalcTotal(cart);
         return toResponse(cartRepository.save(cart));
     }
@@ -119,10 +155,30 @@ public class CartService {
     }
 
     public void clearCart(String customerId) {
+        clearCart(customerId, true);
+    }
+
+    public void clearCart(String customerId, boolean restock) {
         Cart cart = getOrCreateCartEntity(customerId);
+        if (restock) {
+            cart.getItems().forEach(item -> {
+                Product product = item.getProduct();
+                int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+                if (product != null) {
+                    product.setStockQuantity(stockOf(product) + quantity);
+                }
+            });
+        }
         cart.getItems().clear();
         cart.setTotalAmount(0L);
         cartRepository.save(cart);
+    }
+
+    private int stockOf(Product product) {
+        if (product == null || product.getStockQuantity() == null) {
+            return 0;
+        }
+        return Math.max(product.getStockQuantity(), 0);
     }
 
     private void recalcTotal(Cart cart) {
