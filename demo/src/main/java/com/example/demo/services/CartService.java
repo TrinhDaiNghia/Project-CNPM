@@ -27,8 +27,14 @@ public class CartService {
     private final ProductRepository productRepository;
     private final AccessControlService accessControlService;
 
+    @Transactional(readOnly = true)
     public CartResponse getOrCreateCart(String customerId) {
         return toResponse(getOrCreateCartEntity(customerId));
+    }
+
+    @Transactional(readOnly = true)
+    public CartResponse getOrCreateCartResponse(String customerId) {
+        return getOrCreateCart(customerId);
     }
 
     private Cart getOrCreateCartEntity(String customerId) {
@@ -55,21 +61,27 @@ public class CartService {
                 .findFirst()
                 .ifPresentOrElse(
                         item -> {
-                            int nextQuantity = item.getQuantity() + quantity;
+                            int current = item.getQuantity() == null ? 0 : item.getQuantity();
+                            int nextQuantity = current + quantity;
                             item.setQuantity(nextQuantity);
-                            item.setSubTotal(item.getProduct().getPrice() * nextQuantity);
+                            item.setSubTotal((item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice()) * nextQuantity);
                         },
                         () -> cart.getItems().add(
                                 CartItem.builder()
                                         .cart(cart)
                                         .product(product)
                                         .quantity(quantity)
-                                        .subTotal(product.getPrice() * quantity)
+                                        .subTotal((product.getPrice() == null ? 0L : product.getPrice()) * quantity)
                                         .build()
                         )
                 );
+
         recalcTotal(cart);
         return toResponse(cartRepository.save(cart));
+    }
+
+    public CartResponse addItemResponse(String customerId, String productId, int quantity) {
+        return addItem(customerId, productId, quantity);
     }
 
     public CartResponse updateItemQuantity(String customerId, String productId, int quantity) {
@@ -77,15 +89,22 @@ public class CartService {
         if (quantity <= 0) {
             return removeItem(customerId, productId);
         }
+
         cart.getItems().stream()
                 .filter(item -> item.getProduct().getId().equals(productId))
                 .findFirst()
                 .ifPresent(item -> {
                     item.setQuantity(quantity);
-                    item.setSubTotal(item.getProduct().getPrice() * quantity);
+                    long price = item.getProduct() == null || item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice();
+                    item.setSubTotal(price * quantity);
                 });
+
         recalcTotal(cart);
         return toResponse(cartRepository.save(cart));
+    }
+
+    public CartResponse updateItemQuantityResponse(String customerId, String productId, int quantity) {
+        return updateItemQuantity(customerId, productId, quantity);
     }
 
     public CartResponse removeItem(String customerId, String productId) {
@@ -93,6 +112,10 @@ public class CartService {
         cart.getItems().removeIf(item -> item.getProduct().getId().equals(productId));
         recalcTotal(cart);
         return toResponse(cartRepository.save(cart));
+    }
+
+    public CartResponse removeItemResponse(String customerId, String productId) {
+        return removeItem(customerId, productId);
     }
 
     public void clearCart(String customerId) {
@@ -104,7 +127,11 @@ public class CartService {
 
     private void recalcTotal(Cart cart) {
         long total = cart.getItems().stream()
-                .mapToLong(item -> item.getProduct().getPrice() * item.getQuantity())
+                .mapToLong(item -> {
+                    long price = item.getProduct() == null || item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice();
+                    int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+                    return price * quantity;
+                })
                 .sum();
         cart.setTotalAmount(total);
     }
@@ -123,13 +150,13 @@ public class CartService {
     }
 
     private CartItemResponse toItemResponse(CartItem item) {
-        long subTotal = item.getSubTotal() == null
-                ? (item.getProduct() == null || item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice() * item.getQuantity())
-                : item.getSubTotal();
+        int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+        long unitPrice = item.getProduct() == null || item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice();
+        long subTotal = item.getSubTotal() == null ? unitPrice * quantity : item.getSubTotal();
 
         return CartItemResponse.builder()
                 .id(item.getId())
-                .quantity(item.getQuantity())
+                .quantity(quantity)
                 .subTotal(subTotal)
                 .product(toProductResponse(item.getProduct()))
                 .build();
