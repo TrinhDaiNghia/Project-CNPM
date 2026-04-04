@@ -3,6 +3,7 @@ package com.example.demo.services;
 import com.example.demo.dtos.response.NotificationResponse;
 import com.example.demo.entities.Notification;
 import com.example.demo.entities.User;
+import com.example.demo.entities.enums.NotificationType;
 import com.example.demo.entities.enums.UserRole;
 import com.example.demo.exceptions.ResourceNotFoundException;
 import com.example.demo.repositories.NotificationRepository;
@@ -102,6 +103,7 @@ public class NotificationService {
         Notification notification = Notification.builder()
                 .title(REGISTRATION_SUCCESS_TITLE)
                 .content(content)
+                .type(NotificationType.SYSTEM)
                 .directUrl("/profile")
                 .sender(sender)
                 .receiver(receiver)
@@ -128,6 +130,7 @@ public class NotificationService {
         Notification notification = Notification.builder()
                 .title(PASSWORD_RESET_SUCCESS_TITLE)
                 .content(content)
+                .type(NotificationType.SYSTEM)
                 .directUrl("/auth/login")
                 .sender(sender)
                 .receiver(receiver)
@@ -135,6 +138,10 @@ public class NotificationService {
                 .build();
 
         notificationRepository.save(notification);
+    }
+
+    public void sendPasswordResetSuccessNotification(User user) {
+        sendPasswordResetSuccessNotification(getSystemSender().getId(), user);
     }
 
     public void sendOrderSuccessNotification(String senderId, User customer, String orderId) {
@@ -154,6 +161,7 @@ public class NotificationService {
         Notification notification = Notification.builder()
                 .title(ORDER_SUCCESS_TITLE)
                 .content(content)
+                .type(NotificationType.ORDER)
                 .directUrl("/orders/" + orderId)
                 .sender(sender)
                 .receiver(receiver)
@@ -161,6 +169,10 @@ public class NotificationService {
                 .build();
 
         notificationRepository.save(notification);
+    }
+
+    public void sendOrderSuccessNotification(User customer, String orderId) {
+        sendOrderSuccessNotification(getSystemSender().getId(), customer, orderId);
     }
 
     public void sendNewOrderToStoreNotification(String senderId, User store, String orderId) {
@@ -180,6 +192,7 @@ public class NotificationService {
         Notification notification = Notification.builder()
                 .title(NEW_ORDER_TO_STORE_TITLE)
                 .content(content)
+                .type(NotificationType.ORDER)
                 .directUrl("/staff/orders/" + orderId)
                 .sender(sender)
                 .receiver(receiver)
@@ -209,6 +222,7 @@ public class NotificationService {
         Notification notification = Notification.builder()
                 .title(title)
                 .content(content)
+                .type(NotificationType.ORDER)
                 .directUrl("/orders/" + orderId)
                 .sender(sender)
                 .receiver(receiver)
@@ -232,20 +246,39 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> getMyNotifications(String userId) {
+        return getMyNotifications(userId, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<NotificationResponse> getMyNotifications(String userId, Boolean isRead, NotificationType type) {
         if (!StringUtils.hasText(userId)) {
             throw new IllegalArgumentException("userId is required");
         }
 
         accessControlService.requireUserSelfOrPrivileged(userId);
 
-        return notificationRepository.findByReceiverIdOrderByTimeCreatedDesc(userId).stream()
-                .map(this::toResponse)
-                .toList();
+        List<Notification> notifications;
+        if (isRead != null && type != null) {
+            notifications = notificationRepository.findByReceiverIdAndReadAndTypeOrderByTimeCreatedDesc(userId, isRead, type);
+        } else if (isRead != null) {
+            notifications = notificationRepository.findByReceiverIdAndReadOrderByTimeCreatedDesc(userId, isRead);
+        } else if (type != null) {
+            notifications = notificationRepository.findByReceiverIdAndTypeOrderByTimeCreatedDesc(userId, type);
+        } else {
+            notifications = notificationRepository.findByReceiverIdOrderByTimeCreatedDesc(userId);
+        }
+
+        return notifications.stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> getNotificationsByUserId(String userId) {
-        return getMyNotifications(userId);
+        return getMyNotifications(userId, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<NotificationResponse> getNotificationsByUserId(String userId, Boolean isRead, NotificationType type) {
+        return getMyNotifications(userId, isRead, type);
     }
 
     public void markAsRead(String userId, String notificationId) {
@@ -263,6 +296,7 @@ public class NotificationService {
 
         if (!notification.isRead()) {
             notification.setRead(true);
+            notification.setReadAt(Date.from(Instant.now()));
             notificationRepository.save(notification);
         }
     }
@@ -273,7 +307,31 @@ public class NotificationService {
         }
 
         accessControlService.requireUserSelfOrPrivileged(userId);
-        return notificationRepository.markAllAsReadByReceiverId(userId);
+        return notificationRepository.markAllAsReadByReceiverId(userId, Date.from(Instant.now()));
+    }
+
+    public void deleteNotification(String userId, String notificationId) {
+        if (!StringUtils.hasText(userId)) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        if (!StringUtils.hasText(notificationId)) {
+            throw new IllegalArgumentException("notificationId is required");
+        }
+
+        accessControlService.requireUserSelfOrPrivileged(userId);
+        int affectedRows = notificationRepository.deleteByIdAndReceiverId(notificationId, userId);
+        if (affectedRows == 0) {
+            throw new ResourceNotFoundException("Notification not found: " + notificationId);
+        }
+    }
+
+    public int clearAllNotifications(String userId) {
+        if (!StringUtils.hasText(userId)) {
+            throw new IllegalArgumentException("userId is required");
+        }
+
+        accessControlService.requireUserSelfOrPrivileged(userId);
+        return notificationRepository.deleteAllByReceiverId(userId);
     }
 
     private NotificationResponse toResponse(Notification notification) {
@@ -282,7 +340,9 @@ public class NotificationService {
                 .title(notification.getTitle())
                 .content(notification.getContent())
                 .directUrl(notification.getDirectUrl())
+                .type(notification.getType())
                 .isRead(notification.isRead())
+                .readAt(notification.getReadAt())
                 .timeCreated(notification.getTimeCreated())
                 .expiry(notification.getExpiry())
                 .senderId(notification.getSender() != null ? notification.getSender().getId() : null)

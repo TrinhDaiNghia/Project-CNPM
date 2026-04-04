@@ -17,6 +17,7 @@ import com.example.demo.repositories.OrderRepository;
 import com.example.demo.repositories.OrderStatusHistoryRepository;
 import com.example.demo.repositories.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional
 public class OrderService {
@@ -40,6 +42,7 @@ public class OrderService {
     private final VoucherService voucherService;
     private final AccessControlService accessControlService;
     private final OrderStatusHistoryRepository historyRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
@@ -81,7 +84,15 @@ public class OrderService {
         }
 
         order.setTotalAmount(Math.max(totalAmount, 0L));
-        return toOrderResponse(orderRepository.save(order));
+        Order savedOrder = orderRepository.save(order);
+
+        try {
+            notificationService.sendOrderSuccessNotification(customer, savedOrder.getId());
+        } catch (Exception ex) {
+            log.warn("Order success notification failed for order {}", savedOrder.getId(), ex);
+        }
+
+        return toOrderResponse(savedOrder);
     }
 
     @Transactional
@@ -109,7 +120,24 @@ public class OrderService {
                 .changedBy(changedBy)
                 .build();
         historyRepository.save(history);
-        
+
+        try {
+            String senderId = accessControlService.getCurrentUserOrThrow().getId();
+            switch (status) {
+                case CONFIRMED -> notificationService.sendOrderConfirmedNotification(senderId, order.getCustomer(), order.getId());
+                case DELIVERED -> notificationService.sendOrderDeliveredNotification(senderId, order.getCustomer(), order.getId());
+                default -> notificationService.sendOrderStatusUpdateNotification(
+                        senderId,
+                        order.getCustomer(),
+                        order.getId(),
+                        null,
+                        status.name()
+                );
+            }
+        } catch (Exception ex) {
+            log.warn("Order status notification failed for order {}", order.getId(), ex);
+        }
+
         return toOrderResponse(order);
     }
 

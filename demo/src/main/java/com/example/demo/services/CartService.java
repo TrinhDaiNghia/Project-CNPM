@@ -28,11 +28,16 @@ public class CartService {
     private final AccessControlService accessControlService;
 
     @Transactional(readOnly = true)
-    public CartResponse getOrCreateCartResponse(String customerId) {
-        return toCartResponse(getOrCreateCart(customerId));
+    public CartResponse getOrCreateCart(String customerId) {
+        return toResponse(getOrCreateCartEntity(customerId));
     }
 
-    public Cart getOrCreateCart(String customerId) {
+    @Transactional(readOnly = true)
+    public CartResponse getOrCreateCartResponse(String customerId) {
+        return getOrCreateCart(customerId);
+    }
+
+    private Cart getOrCreateCartEntity(String customerId) {
         accessControlService.requireCustomerAccess(customerId);
         return cartRepository.findByCustomerId(customerId).orElseGet(() -> {
             Customer customer = customerRepository.findById(customerId)
@@ -42,16 +47,12 @@ public class CartService {
         });
     }
 
-    public CartResponse addItemResponse(String customerId, String productId, int quantity) {
-        return toCartResponse(addItem(customerId, productId, quantity));
-    }
-
-    public Cart addItem(String customerId, String productId, int quantity) {
+    public CartResponse addItem(String customerId, String productId, int quantity) {
         if (quantity <= 0) {
             throw new IllegalArgumentException("Quantity must be greater than 0");
         }
 
-        Cart cart = getOrCreateCart(customerId);
+        Cart cart = getOrCreateCartEntity(customerId);
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
 
@@ -60,56 +61,65 @@ public class CartService {
                 .findFirst()
                 .ifPresentOrElse(
                         item -> {
-                            int nextQuantity = item.getQuantity() + quantity;
+                            int current = item.getQuantity() == null ? 0 : item.getQuantity();
+                            int nextQuantity = current + quantity;
                             item.setQuantity(nextQuantity);
-                            item.setSubTotal(item.getProduct().getPrice() * nextQuantity);
+                            item.setSubTotal((item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice()) * nextQuantity);
                         },
                         () -> cart.getItems().add(
                                 CartItem.builder()
                                         .cart(cart)
                                         .product(product)
                                         .quantity(quantity)
-                                        .subTotal(product.getPrice() * quantity)
+                                        .subTotal((product.getPrice() == null ? 0L : product.getPrice()) * quantity)
                                         .build()
                         )
                 );
+
         recalcTotal(cart);
-        return cartRepository.save(cart);
+        return toResponse(cartRepository.save(cart));
     }
 
-    public CartResponse updateItemQuantityResponse(String customerId, String productId, int quantity) {
-        return toCartResponse(updateItemQuantity(customerId, productId, quantity));
+    public CartResponse addItemResponse(String customerId, String productId, int quantity) {
+        return addItem(customerId, productId, quantity);
     }
 
-    public Cart updateItemQuantity(String customerId, String productId, int quantity) {
-        Cart cart = getOrCreateCart(customerId);
+    public CartResponse updateItemQuantity(String customerId, String productId, int quantity) {
+        Cart cart = getOrCreateCartEntity(customerId);
         if (quantity <= 0) {
             return removeItem(customerId, productId);
         }
+
         cart.getItems().stream()
                 .filter(item -> item.getProduct().getId().equals(productId))
                 .findFirst()
                 .ifPresent(item -> {
                     item.setQuantity(quantity);
-                    item.setSubTotal(item.getProduct().getPrice() * quantity);
+                    long price = item.getProduct() == null || item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice();
+                    item.setSubTotal(price * quantity);
                 });
+
         recalcTotal(cart);
-        return cartRepository.save(cart);
+        return toResponse(cartRepository.save(cart));
+    }
+
+    public CartResponse updateItemQuantityResponse(String customerId, String productId, int quantity) {
+        return updateItemQuantity(customerId, productId, quantity);
+    }
+
+    public CartResponse removeItem(String customerId, String productId) {
+        Cart cart = getOrCreateCartEntity(customerId);
+        cart.getItems().removeIf(item -> item.getProduct().getId().equals(productId));
+        recalcTotal(cart);
+        return toResponse(cartRepository.save(cart));
     }
 
     public CartResponse removeItemResponse(String customerId, String productId) {
-        return toCartResponse(removeItem(customerId, productId));
-    }
-
-    public Cart removeItem(String customerId, String productId) {
-        Cart cart = getOrCreateCart(customerId);
-        cart.getItems().removeIf(item -> item.getProduct().getId().equals(productId));
-        recalcTotal(cart);
-        return cartRepository.save(cart);
+        return removeItem(customerId, productId);
     }
 
     public void clearCart(String customerId) {
-        Cart cart = getOrCreateCart(customerId);
+        Cart cart = getOrCreateCartEntity(customerId);
         cart.getItems().clear();
         cart.setTotalAmount(0L);
         cartRepository.save(cart);
@@ -117,30 +127,49 @@ public class CartService {
 
     private void recalcTotal(Cart cart) {
         long total = cart.getItems().stream()
-                .mapToLong(item -> item.getProduct().getPrice() * item.getQuantity())
+                .mapToLong(item -> {
+                    long price = item.getProduct() == null || item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice();
+                    int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+                    return price * quantity;
+                })
                 .sum();
         cart.setTotalAmount(total);
     }
 
-    private CartResponse toCartResponse(Cart cart) {
+    private CartResponse toResponse(Cart cart) {
         List<CartItemResponse> items = cart.getItems().stream()
-                .map(item -> CartItemResponse.builder()
-                        .id(item.getId())
-                        .quantity(item.getQuantity())
-                        .subTotal(item.getSubTotal())
-                        .product(CartProductResponse.builder()
-                                .id(item.getProduct().getId())
-                                .name(item.getProduct().getName())
-                                .price(item.getProduct().getPrice())
-                                .build())
-                        .build())
+                .map(this::toItemResponse)
                 .toList();
 
         return CartResponse.builder()
                 .id(cart.getId())
-                .totalAmount(cart.getTotalAmount())
-                .customerId(cart.getCustomer().getId())
+                .totalAmount(cart.getTotalAmount() == null ? 0L : cart.getTotalAmount())
+                .customerId(cart.getCustomer() == null ? null : cart.getCustomer().getId())
                 .items(items)
+                .build();
+    }
+
+    private CartItemResponse toItemResponse(CartItem item) {
+        int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+        long unitPrice = item.getProduct() == null || item.getProduct().getPrice() == null ? 0L : item.getProduct().getPrice();
+        long subTotal = item.getSubTotal() == null ? unitPrice * quantity : item.getSubTotal();
+
+        return CartItemResponse.builder()
+                .id(item.getId())
+                .quantity(quantity)
+                .subTotal(subTotal)
+                .product(toProductResponse(item.getProduct()))
+                .build();
+    }
+
+    private CartProductResponse toProductResponse(Product product) {
+        if (product == null) {
+            return null;
+        }
+        return CartProductResponse.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .price(product.getPrice())
                 .build();
     }
 }
