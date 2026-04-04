@@ -1,5 +1,6 @@
 package com.example.demo.controllers;
 
+import com.example.demo.dtos.request.CancelOrderRequest;
 import com.example.demo.dtos.request.OrderRequest;
 import com.example.demo.dtos.response.OrderResponse;
 import com.example.demo.entities.enums.OrderStatus;
@@ -53,8 +54,16 @@ public class OrderController {
     }
 
     @PatchMapping("/{id}/cancel")
-    public ResponseEntity<OrderResponse> cancel(@PathVariable String id) {
-        return ResponseEntity.ok(orderService.cancelOrder(id));
+    public ResponseEntity<OrderResponse> cancel(
+            @PathVariable String id,
+            @RequestBody(required = false) CancelOrderRequest request) {
+        return ResponseEntity.ok(orderService.cancelOrder(id, request));
+    }
+
+    @PatchMapping("/{id}/cancel-request")
+    public ResponseEntity<OrderResponse> requestCancel(
+            @PathVariable String id,
+            @RequestBody(required = false) CancelOrderRequest request) {
+        return ResponseEntity.ok(orderService.requestCancelForShippingOrder(id, request));
     }
 }
-

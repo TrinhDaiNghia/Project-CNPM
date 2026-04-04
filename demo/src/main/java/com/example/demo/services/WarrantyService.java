@@ -15,6 +15,7 @@ import com.example.demo.entities.User;
 import com.example.demo.entities.Warranty;
 import com.example.demo.entities.enums.OrderStatus;
 import com.example.demo.entities.enums.UserRole;
+import com.example.demo.entities.enums.NotificationType;
 import com.example.demo.entities.enums.WarrantyStatus;
 import com.example.demo.exceptions.ResourceNotFoundException;
 import com.example.demo.repositories.CustomerRepository;
@@ -221,6 +222,8 @@ public class WarrantyService {
         Notification notification = Notification.builder()
                 .title("Warranty request update")
                 .content(content)
+                .type(NotificationType.WARRANTY)
+                .directUrl("/warranty")
                 .sender(sender)
                 .receiver(customerOpt.get())
                 .build();

@@ -1,5 +1,6 @@
 package com.example.demo.services;
 
+import com.example.demo.dtos.request.CancelOrderRequest;
 import com.example.demo.dtos.request.OrderRequest;
 import com.example.demo.dtos.response.OrderItemResponse;
 import com.example.demo.dtos.response.OrderResponse;
@@ -8,31 +9,51 @@ import com.example.demo.entities.Customer;
 import com.example.demo.entities.Order;
 import com.example.demo.entities.OrderItem;
 import com.example.demo.entities.OrderStatusHistory;
+import com.example.demo.entities.Payment;
 import com.example.demo.entities.Product;
+import com.example.demo.entities.Shipping;
 import com.example.demo.entities.Voucher;
 import com.example.demo.entities.enums.OrderStatus;
+import com.example.demo.entities.enums.PaymentMethod;
+import com.example.demo.entities.enums.PaymentStatus;
 import com.example.demo.exceptions.ResourceNotFoundException;
 import com.example.demo.repositories.CustomerRepository;
 import com.example.demo.repositories.OrderRepository;
 import com.example.demo.repositories.OrderStatusHistoryRepository;
 import com.example.demo.repositories.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.mail.MailException;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional
 public class OrderService {
+
+    private static final String REFUND_PROCESSING_MESSAGE = "Hoàn tiền sẽ được xử lý trong 3-7 ngày làm việc.";
+    private static final long DEFAULT_CANCEL_WINDOW_HOURS = 24L;
+    private static final Set<OrderStatus> CUSTOMER_CAN_CANCEL_STATUSES = EnumSet.of(OrderStatus.PENDING, OrderStatus.CONFIRMED);
 
     private final OrderRepository orderRepository;
     private final CustomerRepository customerRepository;
@@ -40,6 +61,14 @@ public class OrderService {
     private final VoucherService voucherService;
     private final AccessControlService accessControlService;
     private final OrderStatusHistoryRepository historyRepository;
+    private final NotificationService notificationService;
+    private final JavaMailSender mailSender;
+
+    @Value("${app.mail.from:${spring.mail.username:}}")
+    private String mailFromAddress;
+
+    @Value("${order.cancel.self-window-hours:24}")
+    private long selfCancelWindowHours;
 
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
@@ -50,38 +79,73 @@ public class OrderService {
 
         Order order = Order.builder()
                 .customer(customer)
-                .note(request.getNote())
-                .shippingAddress(request.getShippingAddress())
+                .note(normalizeText(request.getNote()))
+                .shippingAddress(resolveShippingAddress(request, customer))
                 .build();
 
-        // Build order items
         List<OrderItem> orderItems = new ArrayList<>();
-        long totalAmount = 0;
+        long totalAmount = 0L;
+
         for (OrderRequest.OrderItemRequest itemReq : request.getItems()) {
             Product product = productRepository.findById(itemReq.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + itemReq.getProductId()));
-            long subTotal = product.getPrice() * itemReq.getQuantity();
+
+            int quantity = itemReq.getQuantity();
+            int availableStock = product.getStockQuantity() == null ? 0 : product.getStockQuantity();
+            if (quantity > availableStock) {
+                throw new IllegalArgumentException(
+                        "Sản phẩm " + product.getName() + " chỉ còn " + availableStock + " trong kho"
+                );
+            }
+
+            product.setStockQuantity(availableStock - quantity);
+
+            long unitPrice = product.getPrice() == null ? 0L : product.getPrice();
+            long subTotal = unitPrice * quantity;
+
             OrderItem orderItem = OrderItem.builder()
                     .order(order)
                     .product(product)
-                    .quantity(itemReq.getQuantity())
+                    .quantity(quantity)
                     .subTotal(subTotal)
                     .build();
             orderItems.add(orderItem);
             totalAmount += subTotal;
         }
+
         order.setOrderItems(orderItems);
 
-        // Apply voucher if provided
-        if (request.getVoucherCode() != null && !request.getVoucherCode().isBlank()) {
+        if (StringUtils.hasText(request.getVoucherCode())) {
             Voucher voucher = voucherService.consumeVoucher(request.getVoucherCode());
             order.setVoucher(voucher);
             long discount = totalAmount * voucher.getDiscountPercent() / 100;
             totalAmount -= discount;
         }
 
-        order.setTotalAmount(Math.max(totalAmount, 0L));
-        return toOrderResponse(orderRepository.save(order));
+        totalAmount = Math.max(totalAmount, 0L);
+        order.setTotalAmount(totalAmount);
+
+        Payment payment = buildPayment(request, order, totalAmount);
+        Shipping shipping = buildShipping(request, order, customer);
+        order.setPayment(payment);
+        order.setShipping(shipping);
+
+        Order savedOrder = orderRepository.save(order);
+        appendHistory(savedOrder, OrderStatus.PENDING, "Đơn hàng được tạo", customer.getUsername());
+
+        try {
+            notificationService.sendOrderSuccessNotification(customer, savedOrder.getId());
+        } catch (Exception ex) {
+            log.warn("Order success notification failed for order {}", savedOrder.getId(), ex);
+        }
+
+        try {
+            notificationService.notifyStoreAboutNewOrder(customer, savedOrder.getId());
+        } catch (Exception ex) {
+            log.warn("Store notification for new order {} failed", savedOrder.getId(), ex);
+        }
+
+        return toOrderResponse(savedOrder);
     }
 
     @Transactional
@@ -93,31 +157,37 @@ public class OrderService {
 
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
-        
-        // Validate status transition
+
         validateStatusTransition(order.getStatus(), status);
-        
+
         order.setStatus(status);
+        if (status == OrderStatus.SHIPPING && order.getShipping() != null && order.getShipping().getTrackingDate() == null) {
+            order.getShipping().setTrackingDate(new Date());
+        }
         order = orderRepository.save(order);
-        
-        // Save to history
-        String changedBy = getCurrentUsername();
-        OrderStatusHistory history = OrderStatusHistory.builder()
-                .order(order)
-                .status(status)
-                .note("Cập nhật bởi nhân viên")
-                .changedBy(changedBy)
-                .build();
-        historyRepository.save(history);
-        
+
+        appendHistory(order, status, "Cập nhật bởi nhân viên", getCurrentUsername());
+
+        try {
+            String senderId = accessControlService.getCurrentUserOrThrow().getId();
+            switch (status) {
+                case CONFIRMED -> notificationService.sendOrderConfirmedNotification(senderId, order.getCustomer(), order.getId());
+                case DELIVERED -> notificationService.sendOrderDeliveredNotification(senderId, order.getCustomer(), order.getId());
+                default -> notificationService.sendOrderStatusUpdateNotification(
+                        senderId,
+                        order.getCustomer(),
+                        order.getId(),
+                        null,
+                        status.name()
+                );
+            }
+        } catch (Exception ex) {
+            log.warn("Order status notification failed for order {}", order.getId(), ex);
+        }
+
         return toOrderResponse(order);
     }
 
-    // Theo usecase [19] Update Order Status:
-    // Pending → Confirmed / Cancelled
-    // Confirmed → Shipping / Cancelled
-    // Shipping → Delivered
-    // Delivered → Completed / Returned
     private void validateStatusTransition(OrderStatus current, OrderStatus target) {
         boolean isValid = switch (current) {
             case PENDING -> target == OrderStatus.CONFIRMED || target == OrderStatus.CANCELLED;
@@ -126,10 +196,11 @@ public class OrderService {
             case DELIVERED -> target == OrderStatus.COMPLETED || target == OrderStatus.RETURNED;
             default -> false;
         };
-        
+
         if (!isValid) {
             throw new IllegalStateException(
-                String.format("Cannot transition from %s to %s", current, target));
+                    String.format("Cannot transition from %s to %s", current, target)
+            );
         }
     }
 
@@ -180,9 +251,9 @@ public class OrderService {
                         .build())
                 .toList();
 
-        // Get timeline from history
-        List<OrderStatusHistoryResponse> timeline = historyRepository.findByOrderIdOrderByChangedAtAsc(order.getId())
-                .stream()
+        List<OrderStatusHistory> historyEntries = historyRepository.findByOrderIdOrderByChangedAtAsc(order.getId());
+
+        List<OrderStatusHistoryResponse> timeline = historyEntries.stream()
                 .map(h -> OrderStatusHistoryResponse.builder()
                         .status(h.getStatus().name())
                         .note(h.getNote())
@@ -190,6 +261,45 @@ public class OrderService {
                         .changedBy(h.getChangedBy())
                         .build())
                 .toList();
+
+        if (timeline.isEmpty()) {
+            timeline = List.of(
+                    OrderStatusHistoryResponse.builder()
+                            .status(order.getStatus().name())
+                            .note("Đơn hàng hiện tại")
+                            .changedAt(order.getOrderDate())
+                            .changedBy(order.getCustomer() != null ? order.getCustomer().getUsername() : "system")
+                            .build()
+            );
+        }
+
+        OrderResponse.PaymentResponse paymentResponse = null;
+        if (order.getPayment() != null) {
+            paymentResponse = OrderResponse.PaymentResponse.builder()
+                    .method(order.getPayment().getMethod())
+                    .status(order.getPayment().getStatus())
+                    .isPaid(order.getPayment().getIsPaid())
+                    .paymentDate(order.getPayment().getPaymentDate())
+                    .amount(order.getPayment().getAmount())
+                    .build();
+        }
+
+        OrderResponse.ShippingResponse shippingResponse = null;
+        if (order.getShipping() != null) {
+            shippingResponse = OrderResponse.ShippingResponse.builder()
+                    .trackingNumber(order.getShipping().getTrackingNumber())
+                    .trackingDate(order.getShipping().getTrackingDate())
+                    .carrierName(order.getShipping().getCarrierName())
+                    .carrierPhone(order.getShipping().getCarrierPhone())
+                    .estimatedDelivery(order.getShipping().getEstimatedDelivery())
+                    .build();
+        }
+
+        String latestCancellationNote = historyEntries.stream()
+                .filter(item -> item.getStatus() == OrderStatus.CANCELLED)
+                .reduce((first, second) -> second)
+                .map(OrderStatusHistory::getNote)
+                .orElse(null);
 
         return OrderResponse.builder()
                 .id(order.getId())
@@ -206,6 +316,14 @@ public class OrderService {
                 .voucherCode(order.getVoucher() != null ? order.getVoucher().getCode() : null)
                 .orderItems(itemResponses)
                 .timeline(timeline)
+                .payment(paymentResponse)
+                .shipping(shippingResponse)
+                .canCancel(isSelfCancelable(order))
+                .canRequestCancel(order.getStatus() == OrderStatus.SHIPPING)
+                .refundRequired(isRefundRequired(order))
+                .refundMessage(isRefundRequired(order) ? REFUND_PROCESSING_MESSAGE : null)
+                .cancellationReason(extractCancellationReason(latestCancellationNote))
+                .cancellationNote(latestCancellationNote)
                 .build();
     }
 
@@ -220,27 +338,330 @@ public class OrderService {
     }
 
     @Transactional
-    public OrderResponse cancelOrder(String id) {
+    public OrderResponse cancelOrder(String id, CancelOrderRequest request) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
 
         accessControlService.requireCustomerAccess(order.getCustomer().getId());
-        if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.CONFIRMED) {
-            throw new IllegalStateException("Cannot cancel an order with status: " + order.getStatus());
-        }
+        validateCustomerCancellation(order);
+
+        String reason = normalizeCancelReason(request != null ? request.getReason() : null);
+        String note = normalizeText(request != null ? request.getNote() : null);
+        boolean paidOrder = isPaidOrder(order);
+
+        boolean restockIssue = restockOrderItems(order);
+
         order.setStatus(OrderStatus.CANCELLED);
+        if (order.getPayment() != null && paidOrder) {
+            order.getPayment().setStatus(PaymentStatus.PROCESSING);
+        }
         order = orderRepository.save(order);
-        
-        // Save to history
-        String changedBy = getCurrentUsername();
+
+        String historyNote = buildCancellationHistoryNote(reason, note, restockIssue);
+        appendHistory(order, OrderStatus.CANCELLED, historyNote, getCurrentUsername());
+
+        try {
+            notificationService.notifyCustomerAboutOrderCancellation(order.getCustomer(), order.getId(), reason, paidOrder);
+        } catch (Exception ex) {
+            log.warn("Customer cancel notification failed for order {}", order.getId(), ex);
+        }
+
+        try {
+            notificationService.notifyStoreAboutCustomerCancellation(
+                    order.getCustomer(),
+                    order.getId(),
+                    reason,
+                    paidOrder,
+                    restockIssue
+            );
+        } catch (Exception ex) {
+            log.warn("Store cancel notification failed for order {}", order.getId(), ex);
+        }
+
+        sendCancellationEmailAsync(order, reason, note, paidOrder, restockIssue);
+
+        return toOrderResponse(order);
+    }
+
+    @Transactional
+    public OrderResponse requestCancelForShippingOrder(String id, CancelOrderRequest request) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
+
+        accessControlService.requireCustomerAccess(order.getCustomer().getId());
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new IllegalStateException("Đơn hàng này đã được hủy.");
+        }
+        if (order.getStatus() != OrderStatus.SHIPPING) {
+            throw new IllegalStateException("Chỉ có thể gửi yêu cầu hủy khi đơn hàng đang giao.");
+        }
+
+        String reason = normalizeCancelReason(request != null ? request.getReason() : null);
+        String note = normalizeText(request != null ? request.getNote() : null);
+        String historyNote = "Yêu cầu hủy khi đang giao. Lý do: " + reason;
+        if (StringUtils.hasText(note)) {
+            historyNote += "; Ghi chú: " + note;
+        }
+
+        appendHistory(order, order.getStatus(), historyNote, getCurrentUsername());
+
+        try {
+            notificationService.notifyStoreAboutCancellationRequest(order.getCustomer(), order.getId(), reason, note);
+        } catch (Exception ex) {
+            log.warn("Store cancellation request notification failed for order {}", order.getId(), ex);
+        }
+
+        return toOrderResponse(order);
+    }
+
+    private String buildCancellationHistoryNote(String reason, String note, boolean restockIssue) {
+        StringBuilder builder = new StringBuilder("Lý do: ").append(reason);
+        if (StringUtils.hasText(note)) {
+            builder.append("; Ghi chú: ").append(note);
+        }
+        if (restockIssue) {
+            builder.append("; Cảnh báo: lỗi hoàn kho, cần xử lý thủ công.");
+        }
+        return builder.toString();
+    }
+
+    private void validateCustomerCancellation(Order order) {
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new IllegalStateException("Đơn hàng này đã được hủy.");
+        }
+        if (order.getStatus() == OrderStatus.SHIPPING) {
+            throw new IllegalStateException("Đơn hàng đang được giao. Bạn không thể tự hủy, vui lòng gửi yêu cầu hủy đến nhân viên.");
+        }
+        if (order.getStatus() == OrderStatus.DELIVERED
+                || order.getStatus() == OrderStatus.COMPLETED
+                || order.getStatus() == OrderStatus.RETURNED) {
+            throw new IllegalStateException("Đơn hàng đã giao/hoàn tất không thể hủy. Vui lòng liên hệ hotline để được hỗ trợ.");
+        }
+        if (!CUSTOMER_CAN_CANCEL_STATUSES.contains(order.getStatus())) {
+            throw new IllegalStateException("Không thể hủy đơn ở trạng thái: " + order.getStatus());
+        }
+        if (!isWithinSelfCancelWindow(order)) {
+            throw new IllegalStateException("Đã quá thời gian cho phép hủy đơn tự động. Vui lòng liên hệ hotline để được hỗ trợ.");
+        }
+    }
+
+    private boolean restockOrderItems(Order order) {
+        boolean hasIssue = false;
+        for (OrderItem item : order.getOrderItems()) {
+            try {
+                Product product = item.getProduct();
+                if (product == null) {
+                    throw new IllegalStateException("Missing product on order item " + item.getId());
+                }
+                int currentStock = product.getStockQuantity() == null ? 0 : product.getStockQuantity();
+                int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+                product.setStockQuantity(currentStock + Math.max(quantity, 0));
+            } catch (Exception ex) {
+                hasIssue = true;
+                log.error("Failed to restock product for order item {}", item.getId(), ex);
+            }
+        }
+        return hasIssue;
+    }
+
+    private boolean isSelfCancelable(Order order) {
+        return CUSTOMER_CAN_CANCEL_STATUSES.contains(order.getStatus()) && isWithinSelfCancelWindow(order);
+    }
+
+    private boolean isWithinSelfCancelWindow(Order order) {
+        if (order.getOrderDate() == null) {
+            return true;
+        }
+        long configuredWindowHours = selfCancelWindowHours > 0 ? selfCancelWindowHours : DEFAULT_CANCEL_WINDOW_HOURS;
+        Instant deadline = order.getOrderDate().toInstant().plus(configuredWindowHours, ChronoUnit.HOURS);
+        return !Instant.now().isAfter(deadline);
+    }
+
+    private boolean isRefundRequired(Order order) {
+        return order.getStatus() == OrderStatus.CANCELLED && isPaidOrder(order);
+    }
+
+    private boolean isPaidOrder(Order order) {
+        return order.getPayment() != null && Boolean.TRUE.equals(order.getPayment().getIsPaid());
+    }
+
+    private Payment buildPayment(OrderRequest request, Order order, long amount) {
+        OrderRequest.PaymentRequest paymentRequest = request.getPayment();
+        PaymentMethod method = paymentRequest != null && paymentRequest.getMethod() != null
+                ? paymentRequest.getMethod()
+                : PaymentMethod.COD;
+
+        boolean isPaid = paymentRequest != null && paymentRequest.getIsPaid() != null
+                ? paymentRequest.getIsPaid()
+                : method != PaymentMethod.COD;
+
+        PaymentStatus status = paymentRequest != null && paymentRequest.getStatus() != null
+                ? paymentRequest.getStatus()
+                : (isPaid ? PaymentStatus.COMPLETED : PaymentStatus.RECEIVED);
+
+        Date paymentDate = paymentRequest != null && paymentRequest.getPaymentDate() != null
+                ? paymentRequest.getPaymentDate()
+                : (isPaid ? new Date() : null);
+
+        return Payment.builder()
+                .order(order)
+                .amount(amount)
+                .method(method)
+                .status(status)
+                .isPaid(isPaid)
+                .paymentDate(paymentDate)
+                .build();
+    }
+
+    private Shipping buildShipping(OrderRequest request, Order order, Customer customer) {
+        OrderRequest.ShippingRequest shippingRequest = request.getShipping();
+
+        String carrierPhone = null;
+        if (shippingRequest != null) {
+            carrierPhone = normalizeText(shippingRequest.getCarrierPhone());
+            if (!StringUtils.hasText(carrierPhone)) {
+                carrierPhone = normalizeText(shippingRequest.getPhone());
+            }
+        }
+        if (!StringUtils.hasText(carrierPhone)) {
+            carrierPhone = normalizeText(customer.getPhone());
+        }
+
+        return Shipping.builder()
+                .order(order)
+                .trackingNumber(shippingRequest != null ? normalizeText(shippingRequest.getTrackingNumber()) : null)
+                .carrierName(shippingRequest != null ? normalizeText(shippingRequest.getCarrierName()) : null)
+                .carrierPhone(carrierPhone)
+                .estimatedDelivery(shippingRequest != null ? shippingRequest.getEstimatedDelivery() : null)
+                .build();
+    }
+
+    private String resolveShippingAddress(OrderRequest request, Customer customer) {
+        if (StringUtils.hasText(request.getShippingAddress())) {
+            return request.getShippingAddress().trim();
+        }
+
+        OrderRequest.ShippingRequest shipping = request.getShipping();
+        if (shipping != null) {
+            List<String> addressParts = new ArrayList<>();
+            if (StringUtils.hasText(shipping.getDetailAddress())) {
+                addressParts.add(shipping.getDetailAddress().trim());
+            }
+            if (StringUtils.hasText(shipping.getWard())) {
+                addressParts.add(shipping.getWard().trim());
+            }
+            if (StringUtils.hasText(shipping.getDistrict())) {
+                addressParts.add(shipping.getDistrict().trim());
+            }
+            if (StringUtils.hasText(shipping.getProvince())) {
+                addressParts.add(shipping.getProvince().trim());
+            }
+            if (!addressParts.isEmpty()) {
+                return String.join(", ", addressParts);
+            }
+        }
+
+        return normalizeText(customer.getAddress());
+    }
+
+    private String normalizeText(String input) {
+        if (!StringUtils.hasText(input)) {
+            return null;
+        }
+        return input.trim();
+    }
+
+    private String normalizeCancelReason(String rawReason) {
+        if (!StringUtils.hasText(rawReason)) {
+            return "Khác";
+        }
+        String normalized = rawReason.trim().toUpperCase();
+        return switch (normalized) {
+            case "WRONG_PRODUCT" -> "Đặt nhầm sản phẩm";
+            case "BETTER_PRICE" -> "Tìm thấy giá tốt hơn";
+            case "DONT_NEED_ANYMORE" -> "Không cần nữa";
+            case "CHANGED_MIND" -> "Thay đổi ý định";
+            case "DELIVERY_TOO_LONG" -> "Thời gian giao hàng quá lâu";
+            case "OTHER" -> "Khác";
+            default -> rawReason.trim();
+        };
+    }
+
+    private String extractCancellationReason(String note) {
+        if (!StringUtils.hasText(note)) {
+            return null;
+        }
+        String prefix = "Lý do:";
+        if (!note.startsWith(prefix)) {
+            return null;
+        }
+        String body = note.substring(prefix.length()).trim();
+        int noteIndex = body.indexOf(";");
+        return noteIndex >= 0 ? body.substring(0, noteIndex).trim() : body;
+    }
+
+    private void appendHistory(Order order, OrderStatus status, String note, String changedBy) {
         OrderStatusHistory history = OrderStatusHistory.builder()
                 .order(order)
-                .status(OrderStatus.CANCELLED)
-                .note("Hủy đơn hàng")
+                .status(status)
+                .note(note)
                 .changedBy(changedBy)
                 .build();
         historyRepository.save(history);
-        
-        return toOrderResponse(order);
+    }
+
+    private void sendCancellationEmailAsync(
+            Order order,
+            String reason,
+            String note,
+            boolean paidOrder,
+            boolean restockIssue
+    ) {
+        String email = order.getCustomer() != null ? order.getCustomer().getEmail() : null;
+        if (!StringUtils.hasText(email)) {
+            return;
+        }
+
+        String customerName = StringUtils.hasText(order.getCustomer().getFullName())
+                ? order.getCustomer().getFullName()
+                : order.getCustomer().getUsername();
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        if (StringUtils.hasText(mailFromAddress)) {
+            message.setFrom(mailFromAddress.trim());
+        }
+        message.setTo(email.trim());
+        message.setSubject("Xác nhận hủy đơn hàng #" + order.getId());
+
+        StringBuilder body = new StringBuilder();
+        body.append("Xin chào ").append(customerName).append(",\n\n")
+                .append("Đơn hàng #").append(order.getId()).append(" đã được hủy thành công.\n")
+                .append("Lý do: ").append(reason).append(".\n");
+
+        if (StringUtils.hasText(note)) {
+            body.append("Ghi chú: ").append(note).append("\n");
+        }
+        if (paidOrder) {
+            body.append(REFUND_PROCESSING_MESSAGE).append("\n");
+        }
+        if (restockIssue) {
+            body.append("Lưu ý: hệ thống đang xử lý sự cố hoàn kho, nhân viên sẽ kiểm tra thủ công.\n");
+        }
+
+        body.append("\nTrân trọng,\nChronolux Team");
+        message.setText(body.toString());
+
+        new Thread(() -> {
+            try {
+                mailSender.send(message);
+                log.info("Cancellation email sent to {} for order {}", email, order.getId());
+            } catch (MailException ex) {
+                log.warn("Failed to send cancellation email to {} for order {}", email, order.getId(), ex);
+            } catch (Exception ex) {
+                log.warn("Unexpected error while sending cancellation email to {} for order {}", email, order.getId(), ex);
+            }
+        }, "order-cancel-email-sender").start();
     }
 }
+

@@ -1,8 +1,11 @@
 package com.example.demo.entities;
 
+import com.example.demo.entities.enums.NotificationType;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UuidGenerator;
@@ -37,8 +40,17 @@ public class Notification {
     private String directUrl;
 
     @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false, length = 32)
+    private NotificationType type = NotificationType.SYSTEM;
+
+    @Builder.Default
     @Column(name = "is_read", nullable = false)
     private boolean read = false;
+
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "read_at")
+    private Date readAt;
 
     @CreationTimestamp
     @Temporal(TemporalType.TIMESTAMP)

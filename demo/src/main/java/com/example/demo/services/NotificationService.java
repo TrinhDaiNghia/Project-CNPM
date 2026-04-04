@@ -3,6 +3,7 @@ package com.example.demo.services;
 import com.example.demo.dtos.response.NotificationResponse;
 import com.example.demo.entities.Notification;
 import com.example.demo.entities.User;
+import com.example.demo.entities.enums.NotificationType;
 import com.example.demo.entities.enums.UserRole;
 import com.example.demo.exceptions.ResourceNotFoundException;
 import com.example.demo.repositories.NotificationRepository;
@@ -15,8 +16,11 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +35,9 @@ public class NotificationService {
     private static final String ORDER_CANCELLED_BY_STORE_TITLE = "Đơn hàng đã bị hủy bởi cửa hàng";
     private static final String ORDER_DELIVERED_TITLE = "Đơn hàng đã được giao";
     private static final String ORDER_STATUS_UPDATE_TITLE = "Cập nhật trạng thái đơn hàng";
+    private static final String ORDER_CANCELLED_BY_CUSTOMER_TITLE = "Đơn hàng đã được hủy";
+    private static final String ORDER_CANCELLATION_ALERT_TITLE = "Khách hàng đã hủy đơn";
+    private static final String ORDER_CANCELLATION_REQUEST_TITLE = "Yêu cầu hủy đơn đang giao";
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
@@ -88,6 +95,26 @@ public class NotificationService {
         return sender;
     }
 
+    private List<User> findStoreReceivers() {
+        Map<String, User> unique = new LinkedHashMap<>();
+        userRepository.findByRole(UserRole.OWNER).forEach(user -> unique.put(user.getId(), user));
+        userRepository.findByRole(UserRole.STAFF).forEach(user -> unique.put(user.getId(), user));
+        return new ArrayList<>(unique.values());
+    }
+
+    private void saveOrderNotification(User sender, User receiver, String title, String content, String directUrl) {
+        Notification notification = Notification.builder()
+                .title(title)
+                .content(content)
+                .type(NotificationType.ORDER)
+                .directUrl(directUrl)
+                .sender(sender)
+                .receiver(receiver)
+                .expiry(Date.from(Instant.now().plus(30, ChronoUnit.DAYS)))
+                .build();
+        notificationRepository.save(notification);
+    }
+
     public void sendRegistrationSuccessNotification(User registeredUser) {
         if (registeredUser == null || !StringUtils.hasText(registeredUser.getId())) {
             throw new IllegalArgumentException("Registered user is required");
@@ -102,6 +129,7 @@ public class NotificationService {
         Notification notification = Notification.builder()
                 .title(REGISTRATION_SUCCESS_TITLE)
                 .content(content)
+                .type(NotificationType.SYSTEM)
                 .directUrl("/profile")
                 .sender(sender)
                 .receiver(receiver)
@@ -128,13 +156,18 @@ public class NotificationService {
         Notification notification = Notification.builder()
                 .title(PASSWORD_RESET_SUCCESS_TITLE)
                 .content(content)
-                .directUrl("/login")
+                .type(NotificationType.SYSTEM)
+                .directUrl("/auth/login")
                 .sender(sender)
                 .receiver(receiver)
                 .expiry(Date.from(Instant.now().plus(30, ChronoUnit.DAYS)))
                 .build();
 
         notificationRepository.save(notification);
+    }
+
+    public void sendPasswordResetSuccessNotification(User user) {
+        sendPasswordResetSuccessNotification(getSystemSender().getId(), user);
     }
 
     public void sendOrderSuccessNotification(String senderId, User customer, String orderId) {
@@ -154,6 +187,7 @@ public class NotificationService {
         Notification notification = Notification.builder()
                 .title(ORDER_SUCCESS_TITLE)
                 .content(content)
+                .type(NotificationType.ORDER)
                 .directUrl("/orders/" + orderId)
                 .sender(sender)
                 .receiver(receiver)
@@ -161,6 +195,10 @@ public class NotificationService {
                 .build();
 
         notificationRepository.save(notification);
+    }
+
+    public void sendOrderSuccessNotification(User customer, String orderId) {
+        sendOrderSuccessNotification(getSystemSender().getId(), customer, orderId);
     }
 
     public void sendNewOrderToStoreNotification(String senderId, User store, String orderId) {
@@ -180,13 +218,105 @@ public class NotificationService {
         Notification notification = Notification.builder()
                 .title(NEW_ORDER_TO_STORE_TITLE)
                 .content(content)
-                .directUrl("/admin/orders/" + orderId)
+                .type(NotificationType.ORDER)
+                .directUrl("/staff/orders/" + orderId)
                 .sender(sender)
                 .receiver(receiver)
                 .expiry(Date.from(Instant.now().plus(30, ChronoUnit.DAYS)))
                 .build();
 
         notificationRepository.save(notification);
+    }
+
+    public void notifyStoreAboutNewOrder(User customer, String orderId) {
+        if (customer == null || !StringUtils.hasText(customer.getId())) {
+            throw new IllegalArgumentException("Customer is required");
+        }
+
+        User sender = requireUser(customer.getId());
+        List<User> storeReceivers = findStoreReceivers();
+        for (User receiver : storeReceivers) {
+            String content = "Khách hàng " + sender.getUsername() + " vừa tạo đơn hàng mới: " + orderId + ".";
+            saveOrderNotification(sender, receiver, NEW_ORDER_TO_STORE_TITLE, content, "/staff/orders/" + orderId);
+        }
+    }
+
+    public void notifyCustomerAboutOrderCancellation(User customer, String orderId, String reason, boolean refundRequired) {
+        if (customer == null || !StringUtils.hasText(customer.getId())) {
+            throw new IllegalArgumentException("Customer is required");
+        }
+
+        User receiver = requireUser(customer.getId());
+        User sender = getSystemSender();
+
+        StringBuilder content = new StringBuilder("Đơn hàng ")
+                .append(orderId)
+                .append(" đã được hủy thành công.");
+        if (StringUtils.hasText(reason)) {
+            content.append(" Lý do: ").append(reason).append('.');
+        }
+        if (refundRequired) {
+            content.append(" Hoàn tiền sẽ được xử lý trong 3-7 ngày làm việc.");
+        }
+
+        saveOrderNotification(sender, receiver, ORDER_CANCELLED_BY_CUSTOMER_TITLE, content.toString(), "/orders/" + orderId);
+    }
+
+    public void notifyStoreAboutCustomerCancellation(
+            User customer,
+            String orderId,
+            String reason,
+            boolean refundRequired,
+            boolean restockIssue
+    ) {
+        if (customer == null || !StringUtils.hasText(customer.getId())) {
+            throw new IllegalArgumentException("Customer is required");
+        }
+
+        User sender = getSystemSender();
+        User customerEntity = requireUser(customer.getId());
+        List<User> storeReceivers = findStoreReceivers();
+        for (User receiver : storeReceivers) {
+            StringBuilder content = new StringBuilder("Khách hàng ")
+                    .append(customerEntity.getUsername())
+                    .append(" đã hủy đơn hàng ")
+                    .append(orderId)
+                    .append('.');
+            if (StringUtils.hasText(reason)) {
+                content.append(" Lý do: ").append(reason).append('.');
+            }
+            if (refundRequired) {
+                content.append(" Đơn hàng đã thanh toán, cần xử lý hoàn tiền.");
+            }
+            if (restockIssue) {
+                content.append(" Có lỗi khi hoàn kho, cần xử lý thủ công.");
+            }
+
+            saveOrderNotification(sender, receiver, ORDER_CANCELLATION_ALERT_TITLE, content.toString(), "/staff/orders/" + orderId);
+        }
+    }
+
+    public void notifyStoreAboutCancellationRequest(User customer, String orderId, String reason, String note) {
+        if (customer == null || !StringUtils.hasText(customer.getId())) {
+            throw new IllegalArgumentException("Customer is required");
+        }
+
+        User sender = requireUser(customer.getId());
+        List<User> storeReceivers = findStoreReceivers();
+        for (User receiver : storeReceivers) {
+            StringBuilder content = new StringBuilder("Khách hàng ")
+                    .append(sender.getUsername())
+                    .append(" gửi yêu cầu hủy đơn đang giao ")
+                    .append(orderId)
+                    .append('.');
+            if (StringUtils.hasText(reason)) {
+                content.append(" Lý do: ").append(reason).append('.');
+            }
+            if (StringUtils.hasText(note)) {
+                content.append(" Ghi chú: ").append(note).append('.');
+            }
+            saveOrderNotification(sender, receiver, ORDER_CANCELLATION_REQUEST_TITLE, content.toString(), "/staff/orders/" + orderId);
+        }
     }
 
     public void sendOrderStatusUpdateNotification(String senderId, User customer, String orderId, String title, String newStatus) {
@@ -209,6 +339,7 @@ public class NotificationService {
         Notification notification = Notification.builder()
                 .title(title)
                 .content(content)
+                .type(NotificationType.ORDER)
                 .directUrl("/orders/" + orderId)
                 .sender(sender)
                 .receiver(receiver)
@@ -232,20 +363,39 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> getMyNotifications(String userId) {
+        return getMyNotifications(userId, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<NotificationResponse> getMyNotifications(String userId, Boolean isRead, NotificationType type) {
         if (!StringUtils.hasText(userId)) {
             throw new IllegalArgumentException("userId is required");
         }
 
         accessControlService.requireUserSelfOrPrivileged(userId);
 
-        return notificationRepository.findByReceiverIdOrderByTimeCreatedDesc(userId).stream()
-                .map(this::toResponse)
-                .toList();
+        List<Notification> notifications;
+        if (isRead != null && type != null) {
+            notifications = notificationRepository.findByReceiverIdAndReadAndTypeOrderByTimeCreatedDesc(userId, isRead, type);
+        } else if (isRead != null) {
+            notifications = notificationRepository.findByReceiverIdAndReadOrderByTimeCreatedDesc(userId, isRead);
+        } else if (type != null) {
+            notifications = notificationRepository.findByReceiverIdAndTypeOrderByTimeCreatedDesc(userId, type);
+        } else {
+            notifications = notificationRepository.findByReceiverIdOrderByTimeCreatedDesc(userId);
+        }
+
+        return notifications.stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> getNotificationsByUserId(String userId) {
-        return getMyNotifications(userId);
+        return getMyNotifications(userId, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<NotificationResponse> getNotificationsByUserId(String userId, Boolean isRead, NotificationType type) {
+        return getMyNotifications(userId, isRead, type);
     }
 
     public void markAsRead(String userId, String notificationId) {
@@ -263,6 +413,7 @@ public class NotificationService {
 
         if (!notification.isRead()) {
             notification.setRead(true);
+            notification.setReadAt(Date.from(Instant.now()));
             notificationRepository.save(notification);
         }
     }
@@ -273,7 +424,31 @@ public class NotificationService {
         }
 
         accessControlService.requireUserSelfOrPrivileged(userId);
-        return notificationRepository.markAllAsReadByReceiverId(userId);
+        return notificationRepository.markAllAsReadByReceiverId(userId, Date.from(Instant.now()));
+    }
+
+    public void deleteNotification(String userId, String notificationId) {
+        if (!StringUtils.hasText(userId)) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        if (!StringUtils.hasText(notificationId)) {
+            throw new IllegalArgumentException("notificationId is required");
+        }
+
+        accessControlService.requireUserSelfOrPrivileged(userId);
+        int affectedRows = notificationRepository.deleteByIdAndReceiverId(notificationId, userId);
+        if (affectedRows == 0) {
+            throw new ResourceNotFoundException("Notification not found: " + notificationId);
+        }
+    }
+
+    public int clearAllNotifications(String userId) {
+        if (!StringUtils.hasText(userId)) {
+            throw new IllegalArgumentException("userId is required");
+        }
+
+        accessControlService.requireUserSelfOrPrivileged(userId);
+        return notificationRepository.deleteAllByReceiverId(userId);
     }
 
     private NotificationResponse toResponse(Notification notification) {
@@ -282,7 +457,9 @@ public class NotificationService {
                 .title(notification.getTitle())
                 .content(notification.getContent())
                 .directUrl(notification.getDirectUrl())
+                .type(notification.getType())
                 .isRead(notification.isRead())
+                .readAt(notification.getReadAt())
                 .timeCreated(notification.getTimeCreated())
                 .expiry(notification.getExpiry())
                 .senderId(notification.getSender() != null ? notification.getSender().getId() : null)
@@ -290,4 +467,3 @@ public class NotificationService {
                 .build();
     }
 }
-
