@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -25,11 +26,14 @@ public class EmailOtpService {
     private static final String RESET_PASSWORD_PURPOSE = "RESET_PASSWORD";
 
     private final JavaMailSender mailSender;
+    private final String mailFrom;
     private final SecureRandom secureRandom = new SecureRandom();
     private final Map<String, OtpPayload> otpStore = new ConcurrentHashMap<>();
 
-    public EmailOtpService(JavaMailSender mailSender) {
+    public EmailOtpService(JavaMailSender mailSender,
+                           @Value("${spring.mail.username:}") String mailFrom) {
         this.mailSender = mailSender;
+        this.mailFrom = mailFrom;
     }
 
     public long sendRegistrationOtp(String email) {
@@ -96,6 +100,9 @@ public class EmailOtpService {
 
     private void sendOtpEmail(String email, String otp, String subject) {
         SimpleMailMessage message = new SimpleMailMessage();
+        if (mailFrom != null && !mailFrom.isBlank()) {
+            message.setFrom(mailFrom);
+        }
         message.setTo(email);
         message.setSubject(subject);
         message.setText("Your OTP code is: " + otp + "\nThis code will expire in 10 minutes.");
@@ -132,4 +139,6 @@ public class EmailOtpService {
         private int failedAttempts;
     }
 }
+
+
 
