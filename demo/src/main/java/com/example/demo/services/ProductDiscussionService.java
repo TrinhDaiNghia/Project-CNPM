@@ -77,7 +77,7 @@ public class ProductDiscussionService {
 
         String answer = geminiService.generateAnswer(context, normalizedQuestion, history);
         if (!StringUtils.hasText(answer)) {
-            answer = "Xin loi, hien tai he thong chua the tra loi cau hoi nay. Vui long thu lai sau.";
+            answer = "Xin lỗi, hiện tại hệ thống chưa thể trả lời câu hỏi này. Vui lòng thử lại sau.";
         }
 
         DiscussionMessage answerMessage = discussionMessageRepository.saveAndFlush(
@@ -132,9 +132,9 @@ public class ProductDiscussionService {
 
     private String buildFallbackContext(Product product) {
         return String.format(
-                "Product: %s. Brand: %s. Price: %s VND. Stock quantity: %d. Movement type: %s. Glass material: %s. " +
-                        "Water resistance: %s. Face size: %s. Strap material: %s. Strap color: %s. Case color: %s. " +
-                        "Face color: %s. Description: %s.",
+                "Sản phẩm: %s. Thương hiệu: %s. Giá bán: %s VND. Số lượng tồn kho: %d. Loại máy: %s. Chất liệu kính: %s. " +
+                        "Kháng nước: %s. Kích thước mặt: %s. Chất liệu dây: %s. Màu dây: %s. Màu vỏ: %s. " +
+                        "Màu mặt: %s. Mô tả: %s.",
                 safeText(product.getName()),
                 safeText(product.getBrand()),
                 formatPrice(product.getPrice()),
@@ -152,12 +152,12 @@ public class ProductDiscussionService {
     }
 
     private String safeText(String value) {
-        return StringUtils.hasText(value) ? value.trim() : "unknown";
+        return StringUtils.hasText(value) ? value.trim() : "không rõ";
     }
 
     private String formatPrice(Long price) {
         if (price == null) {
-            return "unknown";
+            return "không rõ";
         }
         return String.format("%,d", price);
     }

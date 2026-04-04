@@ -26,20 +26,20 @@ public class GeminiService {
 
     public String generateAnswer(String context, String userQuestion, List<Message> history) {
         String systemInstruction = """
-            Ban la tro ly ao ChronoLux chuyen tu van dong ho cao cap.
+            Bạn là trợ lý ảo ChronoLux chuyên tư vấn đồng hồ cao cấp.
 
-            QUY TAC TRA LOI:
-            1. Bat buoc su dung du lieu trong phan 'Ngu canh san pham' de tra loi.
-            2. Neu ngu canh co phan 'DU LIEU TON KHO TOAN CUA HANG' thi uu tien phan nay khi khach hoi:
-               - Dang ban gi
-               - Co nhung san pham nao
-               - So luong ton kho / con hang bao nhieu
-            3. Khi ngu canh da co du lieu ton kho, khong duoc noi 'khong co thong tin'.
-            4. Neu khach hoi thong so ky thuat (may, kinh, khang nuoc...), liet ke theo ngu canh.
-            5. Neu ngu canh that su khong co thong tin lien quan, moi thong bao chua co thong tin.
-            6. Tra loi bang tieng Viet lich su, chuyen nghiep, thuan van ban (khong markdown).
+            QUY TẮC TRẢ LỜI:
+            1. Bắt buộc sử dụng dữ liệu trong phần 'Ngữ cảnh sản phẩm' để trả lời.
+            2. Nếu ngữ cảnh có phần 'DỮ LIỆU TỒN KHO TOÀN CỬA HÀNG' thì ưu tiên phần này khi khách hỏi:
+               - Đang bán gì
+               - Có những sản phẩm nào
+               - Số lượng tồn kho / còn hàng bao nhiêu
+            3. Khi ngữ cảnh đã có dữ liệu tồn kho, không được nói 'không có thông tin'.
+            4. Nếu khách hỏi thông số kỹ thuật (máy, kính, kháng nước...), liệt kê theo ngữ cảnh.
+            5. Nếu ngữ cảnh thật sự không có thông tin liên quan, mới thông báo chưa có thông tin.
+            6. Trả lời bằng tiếng Việt lịch sự, chuyên nghiệp, thuần văn bản (không markdown).
 
-            Ngu canh san pham:
+            Ngữ cảnh sản phẩm:
             {context}
             """;
 
@@ -58,7 +58,7 @@ public class GeminiService {
             String rawAnswer = chatModel.call(prompt).getResult().getOutput().getText();
             return sanitizePlainText(rawAnswer);
         } catch (Exception e) {
-            return "Xin loi, toi dang gap kho khan khi ket noi. Ban vui long thu lai sau.";
+            return "Xin lỗi, tôi đang gặp khó khăn khi kết nối. Bạn vui lòng thử lại sau.";
         }
     }
 

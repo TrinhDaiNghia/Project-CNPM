@@ -394,7 +394,7 @@ public class AiChatService {
                 .toList();
 
         if (activeProducts.isEmpty()) {
-            return "DU LIEU TON KHO TOAN CUA HANG: khong co san pham dang ban.";
+            return "DỮ LIỆU TỒN KHO TOÀN CỬA HÀNG: không có sản phẩm đang bán.";
         }
 
         int totalStock = activeProducts.stream()
@@ -405,28 +405,28 @@ public class AiChatService {
 
         int maxItems = 40;
         StringBuilder builder = new StringBuilder();
-        builder.append("DU LIEU TON KHO TOAN CUA HANG: ")
-                .append("tong so mau dang ban = ").append(activeProducts.size())
-                .append(", tong so luong ton = ").append(totalStock).append(".")
+        builder.append("DỮ LIỆU TỒN KHO TOÀN CỬA HÀNG: ")
+                .append("tổng số mẫu đang bán = ").append(activeProducts.size())
+                .append(", tổng số lượng tồn = ").append(totalStock).append(".")
                 .append("\n");
 
         int limit = Math.min(maxItems, activeProducts.size());
         for (int i = 0; i < limit; i++) {
             Product product = activeProducts.get(i);
             int stock = product.getStockQuantity() == null ? 0 : Math.max(0, product.getStockQuantity());
-            String brand = StringUtils.hasText(product.getBrand()) ? product.getBrand().trim() : "Khong ro thuong hieu";
-            builder.append("San pham ")
+            String brand = StringUtils.hasText(product.getBrand()) ? product.getBrand().trim() : "Không rõ thương hiệu";
+            builder.append("Sản phẩm ")
                     .append(i + 1)
                     .append(": id=").append(product.getId())
-                    .append(", ten=").append(product.getName())
-                    .append(", thuong hieu=").append(brand)
-                    .append(", so luong ton=").append(stock)
+                    .append(", tên=").append(product.getName())
+                    .append(", thương hiệu=").append(brand)
+                    .append(", số lượng tồn=").append(stock)
                     .append(".\n");
         }
         if (activeProducts.size() > limit) {
-            builder.append("Con ")
+            builder.append("Còn ")
                     .append(activeProducts.size() - limit)
-                    .append(" san pham dang ban khac khong hien thi trong danh sach rut gon.");
+                    .append(" sản phẩm đang bán khác không hiển thị trong danh sách rút gọn.");
         }
         return builder.toString().trim();
     }
@@ -435,7 +435,7 @@ public class AiChatService {
         String lower = input.toLowerCase(Locale.ROOT);
         String noAccent = Normalizer.normalize(lower, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}+", "");
-        return noAccent.replace('đ', 'd')
+        return noAccent.replace('\u0111', 'd')
                 .replaceAll("[^a-z0-9\\s]", " ")
                 .replaceAll("\\s+", " ")
                 .trim();

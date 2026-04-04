@@ -25,7 +25,7 @@ public class QdrantService {
     private int searchTopK;
 
     /**
-     * Day thong tin san pham len Qdrant (Upsert)
+     * Đẩy thông tin sản phẩm lên Qdrant (Upsert)
      */
     public void upsertProduct(Product product) {
         try {
@@ -72,7 +72,7 @@ public class QdrantService {
     }
 
     /**
-     * Xoa san pham khoi Qdrant
+     * Xóa sản phẩm khỏi Qdrant
      */
     public void deleteProduct(String productId) {
         try {
@@ -83,7 +83,7 @@ public class QdrantService {
     }
 
     /**
-     * Tim kiem cac san pham co dac diem tuong dong voi cau hoi cua khach
+     * Tìm kiếm các sản phẩm có đặc điểm tương đồng với câu hỏi của khách
      */
     public String searchRelevantContext(String query) {
         try {
@@ -100,7 +100,7 @@ public class QdrantService {
     }
 
     /**
-     * Tim context tu embeddings, chi lay document cua dung productId.
+     * Tìm context từ embeddings, chỉ lấy document của đúng productId.
      */
     public String searchRelevantContextByProduct(String productId, String query) {
         if (!StringUtils.hasText(productId)) {
@@ -144,7 +144,7 @@ public class QdrantService {
 
     private String formatPrice(Object price) {
         if (price == null) {
-            return "khong ro";
+            return "không rõ";
         }
         if (price instanceof Number number) {
             return String.format("%,.0f", number.doubleValue());
