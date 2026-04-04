@@ -1,6 +1,6 @@
 package com.example.demo.controllers;
 
-import com.example.demo.entities.Cart;
+import com.example.demo.dtos.response.CartResponse;
 import com.example.demo.services.CartService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,12 +14,12 @@ public class CartController {
     private final CartService cartService;
 
     @GetMapping("/{customerId}")
-    public ResponseEntity<Cart> getCart(@PathVariable String customerId) {
+    public ResponseEntity<CartResponse> getCart(@PathVariable String customerId) {
         return ResponseEntity.ok(cartService.getOrCreateCart(customerId));
     }
 
     @PostMapping("/{customerId}/items")
-    public ResponseEntity<Cart> addItem(
+    public ResponseEntity<CartResponse> addItem(
             @PathVariable String customerId,
             @RequestParam String productId,
             @RequestParam int quantity) {
@@ -27,7 +27,7 @@ public class CartController {
     }
 
     @PutMapping("/{customerId}/items/{productId}")
-    public ResponseEntity<Cart> updateItem(
+    public ResponseEntity<CartResponse> updateItem(
             @PathVariable String customerId,
             @PathVariable String productId,
             @RequestParam int quantity) {
@@ -35,7 +35,7 @@ public class CartController {
     }
 
     @DeleteMapping("/{customerId}/items/{productId}")
-    public ResponseEntity<Cart> removeItem(
+    public ResponseEntity<CartResponse> removeItem(
             @PathVariable String customerId,
             @PathVariable String productId) {
         return ResponseEntity.ok(cartService.removeItem(customerId, productId));
