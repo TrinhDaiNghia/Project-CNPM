@@ -1,4 +1,4 @@
-﻿package com.example.demo.controllers;
+package com.example.demo.controllers;
 
 import com.example.demo.dtos.request.ChatRequest;
 import com.example.demo.dtos.request.SupportReplyRequest;

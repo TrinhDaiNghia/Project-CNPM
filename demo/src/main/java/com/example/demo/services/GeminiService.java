@@ -1,16 +1,15 @@
 package com.example.demo.services;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.SystemPromptTemplate;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.stereotype.Service;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
-import java.util.ArrayList;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -27,19 +26,20 @@ public class GeminiService {
 
     public String generateAnswer(String context, String userQuestion, List<Message> history) {
         String systemInstruction = """
-            Bạn là trợ lý ảo ChronoLux chuyên tư vấn đồng hồ cao cấp.
-            
-            QUY TẮC TRẢ LỜI:
-            1. Sử dụng thông tin trong phần 'Ngữ cảnh' dưới đây để trả lời.
-            2. Kiểm tra kỹ 'Số lượng còn lại trong kho' trước khi trả lời về tình trạng hàng. 
-               - Nếu số lượng > 0: Xác nhận còn hàng.
-               - Nếu số lượng = 0: Thông báo hết hàng và gợi ý mẫu tương tự.
-            3. Nếu khách hỏi về thông số (mặt kính, loại máy, kháng nước...), hãy liệt kê chi tiết từ ngữ cảnh.
-            4. Trả lời bằng tiếng Việt lịch sự, chuyên nghiệp.
-            5. Nếu thông tin hoàn toàn không có trong ngữ cảnh, hãy báo khách hàng rằng bạn chưa có thông tin về mẫu này và đề nghị kết nối nhân viên.
-            6. Trả lời thuần văn bản, không dùng ký tự định dạng Markdown như **, #, -, __.
+            Ban la tro ly ao ChronoLux chuyen tu van dong ho cao cap.
 
-            Ngữ cảnh sản phẩm:
+            QUY TAC TRA LOI:
+            1. Bat buoc su dung du lieu trong phan 'Ngu canh san pham' de tra loi.
+            2. Neu ngu canh co phan 'DU LIEU TON KHO TOAN CUA HANG' thi uu tien phan nay khi khach hoi:
+               - Dang ban gi
+               - Co nhung san pham nao
+               - So luong ton kho / con hang bao nhieu
+            3. Khi ngu canh da co du lieu ton kho, khong duoc noi 'khong co thong tin'.
+            4. Neu khach hoi thong so ky thuat (may, kinh, khang nuoc...), liet ke theo ngu canh.
+            5. Neu ngu canh that su khong co thong tin lien quan, moi thong bao chua co thong tin.
+            6. Tra loi bang tieng Viet lich su, chuyen nghiep, thuan van ban (khong markdown).
+
+            Ngu canh san pham:
             {context}
             """;
 
@@ -58,7 +58,7 @@ public class GeminiService {
             String rawAnswer = chatModel.call(prompt).getResult().getOutput().getText();
             return sanitizePlainText(rawAnswer);
         } catch (Exception e) {
-            return "Xin lỗi, tôi đang gặp khó khăn khi kết nối. Bạn vui lòng thử lại sau.";
+            return "Xin loi, toi dang gap kho khan khi ket noi. Ban vui long thu lai sau.";
         }
     }
 

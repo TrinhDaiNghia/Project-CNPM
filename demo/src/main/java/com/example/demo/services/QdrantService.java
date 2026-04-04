@@ -92,14 +92,54 @@ public class QdrantService {
                 SearchRequest.builder().query(query).topK(topK).build()
             );
 
-            return results.stream()
-                .map(Document::getText)
-                .filter(StringUtils::hasText)
-                .collect(Collectors.joining("\n---\n"));
+            return joinDocumentTexts(results);
         } catch (Exception ex) {
             log.error("Failed to search context from Qdrant for query: {}", query, ex);
             return "";
         }
+    }
+
+    /**
+     * Tim context tu embeddings, chi lay document cua dung productId.
+     */
+    public String searchRelevantContextByProduct(String productId, String query) {
+        if (!StringUtils.hasText(productId)) {
+            return "";
+        }
+
+        try {
+            int topK = Math.max(10, searchTopK * 4);
+            List<Document> results = vectorStore.similaritySearch(
+                    SearchRequest.builder().query(query).topK(topK).build()
+            );
+
+            List<Document> productResults = results.stream()
+                    .filter(document -> matchesProduct(document, productId))
+                    .toList();
+
+            return joinDocumentTexts(productResults);
+        } catch (Exception ex) {
+            log.error("Failed to search product context from Qdrant for productId={}, query={}", productId, query, ex);
+            return "";
+        }
+    }
+
+    private boolean matchesProduct(Document document, String productId) {
+        if (document == null || document.getMetadata() == null) {
+            return false;
+        }
+        Object metadataProductId = document.getMetadata().get("productId");
+        return metadataProductId != null && productId.equals(String.valueOf(metadataProductId));
+    }
+
+    private String joinDocumentTexts(List<Document> documents) {
+        if (documents == null || documents.isEmpty()) {
+            return "";
+        }
+        return documents.stream()
+                .map(Document::getText)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.joining("\n---\n"));
     }
 
     private String formatPrice(Object price) {
