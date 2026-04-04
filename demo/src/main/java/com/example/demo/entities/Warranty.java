@@ -11,6 +11,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.util.Date;
@@ -28,6 +30,22 @@ public class Warranty {
 	@UuidGenerator
 	@Column(name = "id", updatable = false, nullable = false, length = 36)
 	private String id;
+
+	@Size(max = 36)
+	@Column(name = "user_id", length = 36)
+	private String userId;
+
+	@Size(max = 36)
+	@Column(name = "customer_id", nullable = false, length = 36)
+	private String customerId;
+
+	@Size(max = 36)
+	@Column(name = "order_id", nullable = true, length = 36)
+	private String orderId;
+
+	@Size(max = 36)
+	@Column(name = "order_item_id", nullable = true, length = 36)
+	private String orderItemId;
 
 	@NotBlank(message = "Customer phone is required")
 	@Size(max = 20, message = "Customer phone must not exceed 20 characters")
@@ -53,6 +71,16 @@ public class Warranty {
 	@Temporal(TemporalType.TIMESTAMP)
 	@Column(name = "expected_return_date", nullable = false)
 	private Date expectedReturnDate;
+
+	@CreationTimestamp
+	@Temporal(TemporalType.TIMESTAMP)
+	@Column(name = "created_at", updatable = false)
+	private Date createdAt;
+
+	@UpdateTimestamp
+	@Temporal(TemporalType.TIMESTAMP)
+	@Column(name = "updated_at")
+	private Date updatedAt;
 
 	@NotNull(message = "Warranty status is required")
 	@Enumerated(EnumType.STRING)
