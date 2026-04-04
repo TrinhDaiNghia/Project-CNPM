@@ -14,7 +14,6 @@ import com.example.demo.entities.Product;
 import com.example.demo.entities.User;
 import com.example.demo.entities.Warranty;
 import com.example.demo.entities.enums.OrderStatus;
-import com.example.demo.entities.enums.UserRole;
 import com.example.demo.entities.enums.NotificationType;
 import com.example.demo.entities.enums.WarrantyStatus;
 import com.example.demo.exceptions.ResourceNotFoundException;
@@ -42,20 +41,18 @@ public class WarrantyService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final CustomerRepository customerRepository;
-    private final com.example.demo.repositories.UserRepository userRepository;
     private final NotificationRepository notificationRepository;
     private final AccessControlService accessControlService;
 
     public WarrantyResponse createWarrantyRequest(WarrantyRequest request) {
         accessControlService.requirePrivilegedRole();
 
-        String customerId = resolveCustomerId(request);
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + request.getProductId()));
 
         Warranty warranty = new Warranty();
         warranty.setUserId(null);
-        warranty.setCustomerId(customerId);
+        warranty.setCustomerId(normalizeBlankToNull(request.getCustomerId()));
         warranty.setOrderId(null);
         warranty.setOrderItemId(null);
         warranty.setCustomerPhone(request.getCustomerPhone().trim());
@@ -210,7 +207,11 @@ public class WarrantyService {
     }
 
     private void notifyCustomerIfPossible(Warranty warranty, User sender, WarrantyStatus status) {
-        Optional<Customer> customerOpt = customerRepository.findByPhone(warranty.getCustomerPhone());
+        if (warranty.getCustomerId() == null || warranty.getCustomerId().isBlank()) {
+            return;
+        }
+
+        Optional<Customer> customerOpt = customerRepository.findById(warranty.getCustomerId());
         if (customerOpt.isEmpty()) {
             return;
         }
@@ -243,25 +244,5 @@ public class WarrantyService {
             return null;
         }
         return value.trim();
-    }
-
-    private String resolveCustomerId(WarrantyRequest request) {
-        if (request.getCustomerId() != null && !request.getCustomerId().isBlank()) {
-            return request.getCustomerId().trim();
-        }
-
-        if (request.getCustomerPhone() == null || request.getCustomerPhone().isBlank()) {
-            throw new IllegalArgumentException("Customer ID is required");
-        }
-
-        User customerUser = userRepository.findByPhone(request.getCustomerPhone().trim())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Customer not found by phone: " + request.getCustomerPhone()));
-
-        if (customerUser.getRole() != UserRole.CUSTOMER) {
-            throw new ResourceNotFoundException("Customer not found by phone: " + request.getCustomerPhone());
-        }
-
-        return customerUser.getId();
     }
 }

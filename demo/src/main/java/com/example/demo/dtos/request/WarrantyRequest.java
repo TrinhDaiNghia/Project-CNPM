@@ -12,6 +12,8 @@ import java.util.Date;
 @Data
 public class WarrantyRequest {
 
+    private String customerId;
+
     @NotBlank(message = "Customer phone is required")
     @Size(max = 20)
     private String customerPhone;
@@ -19,8 +21,6 @@ public class WarrantyRequest {
     @NotBlank(message = "Customer name is required")
     @Size(max = 100)
     private String customerName;
-
-    private String customerId;
 
     @NotBlank(message = "Issue description is required")
     @Size(max = 1000)
