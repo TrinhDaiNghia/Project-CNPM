@@ -36,7 +36,7 @@ public class Warranty {
 	private String userId;
 
 	@Size(max = 36)
-	@Column(name = "customer_id", nullable = false, length = 36)
+	@Column(name = "customer_id", nullable = true, length = 36)
 	private String customerId;
 
 	@Size(max = 36)
