@@ -1,10 +1,12 @@
 package com.example.demo.services;
 
+import com.example.demo.dtos.request.ChangePasswordRequest;
 import com.example.demo.entities.User;
 import com.example.demo.entities.enums.UserRole;
 import com.example.demo.exceptions.ResourceNotFoundException;
 import com.example.demo.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,6 +83,23 @@ public class UserService {
         User updatedUser = userRepository.save(existing);
         userProfileService.syncProfileForRole(updatedUser);
         return updatedUser;
+    }
+
+    public void changePassword(String id, ChangePasswordRequest request) {
+        User existing = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+        User currentUser = accessControlService.getCurrentUserOrThrow();
+
+        if (!currentUser.getId().equals(existing.getId())) {
+            throw new AccessDeniedException("You are not allowed to change this password");
+        }
+
+        if (!passwordEncoder.matches(request.getOldPassword(), existing.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
+
+        existing.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(existing);
     }
 
     public User lockStaff(String id) {

@@ -1,5 +1,6 @@
 package com.example.demo.controllers;
 
+import com.example.demo.dtos.request.ChangePasswordRequest;
 import com.example.demo.dtos.request.UserCreateRequest;
 import com.example.demo.dtos.request.UserUpdateRequest;
 import com.example.demo.dtos.response.UserResponse;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -56,6 +58,15 @@ public class UserController {
     public ResponseEntity<UserResponse> update(@PathVariable String id, @Valid @RequestBody UserUpdateRequest request) {
         User updated = userService.updateUser(id, toUserEntity(request));
         return ResponseEntity.ok(toUserResponse(updated));
+    }
+
+    @PatchMapping("/{id}/change-password")
+    public ResponseEntity<Map<String, String>> changePassword(
+            @PathVariable String id,
+            @Valid @RequestBody ChangePasswordRequest request
+    ) {
+        userService.changePassword(id, request);
+        return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
     }
 
     @DeleteMapping("/{id}")
