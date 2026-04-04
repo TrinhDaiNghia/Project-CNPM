@@ -10,6 +10,7 @@ import com.example.demo.repositories.CustomerRepository;
 import com.example.demo.repositories.ProductRepository;
 import com.example.demo.repositories.ReviewRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,8 +29,9 @@ public class ReviewService {
 
     public ReviewResponse createReview(ReviewRequest request) {
         accessControlService.requireCustomerAccess(request.getCustomerId());
+
         if (reviewRepository.existsByCustomerIdAndProductId(request.getCustomerId(), request.getProductId())) {
-            throw new IllegalStateException("Review already exists for this customer and product");
+            throw new IllegalStateException("Bạn đã đánh giá sản phẩm này rồi.");
         }
 
         Customer customer = customerRepository.findById(request.getCustomerId())
@@ -42,7 +44,11 @@ public class ReviewService {
         review.setProduct(product);
         review.setRating(request.getRating());
         review.setComment(request.getComment());
-        return toResponse(reviewRepository.save(review));
+        try {
+            return toResponse(reviewRepository.save(review));
+        } catch (DataIntegrityViolationException ex) {
+            throw new IllegalStateException("Bạn đã đánh giá sản phẩm này rồi.");
+        }
     }
 
     public ReviewResponse updateReview(String id, ReviewRequest request) {
