@@ -2,9 +2,12 @@ package com.example.demo.services;
 
 import com.example.demo.dtos.request.CancelOrderRequest;
 import com.example.demo.dtos.request.OrderRequest;
+import com.example.demo.dtos.request.QrPaymentPrepareRequest;
 import com.example.demo.dtos.response.OrderItemResponse;
 import com.example.demo.dtos.response.OrderResponse;
 import com.example.demo.dtos.response.OrderStatusHistoryResponse;
+import com.example.demo.dtos.response.QrPaymentResponse;
+import com.example.demo.dtos.response.QrPaymentStatusResponse;
 import com.example.demo.entities.Customer;
 import com.example.demo.entities.Order;
 import com.example.demo.entities.OrderItem;
@@ -21,6 +24,8 @@ import com.example.demo.repositories.CustomerRepository;
 import com.example.demo.repositories.OrderRepository;
 import com.example.demo.repositories.OrderStatusHistoryRepository;
 import com.example.demo.repositories.ProductRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,14 +41,25 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 @Service
 @Slf4j
@@ -54,15 +70,39 @@ public class OrderService {
     private static final String REFUND_PROCESSING_MESSAGE = "Hoàn tiền sẽ được xử lý trong 3-7 ngày làm việc.";
     private static final long DEFAULT_CANCEL_WINDOW_HOURS = 24L;
     private static final Set<OrderStatus> CUSTOMER_CAN_CANCEL_STATUSES = EnumSet.of(OrderStatus.PENDING, OrderStatus.CONFIRMED);
+    private static final String QR_PAYMENT_STATUS_PENDING = "PENDING";
+    private static final String QR_PAYMENT_STATUS_SUCCESS = "SUCCESS";
+    private static final String QR_PAYMENT_STATUS_WRONG_AMOUNT = "WRONG_AMOUNT";
+    private static final String QR_PAYMENT_STATUS_CANCELLED = "CANCELLED";
+    private static final String QR_BASE_URL = "https://qr.sepay.vn/img";
 
     private final OrderRepository orderRepository;
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
     private final VoucherService voucherService;
     private final AccessControlService accessControlService;
+    private final CartService cartService;
     private final OrderStatusHistoryRepository historyRepository;
     private final NotificationService notificationService;
     private final JavaMailSender mailSender;
+    private final ObjectMapper objectMapper;
+    private final ConcurrentMap<String, PendingQrPaymentSession> pendingQrPaymentSessions = new ConcurrentHashMap<>();
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(8))
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
+
+    @Value("${app.qr.account-number:${payment.qr.account-number:0359537981}}")
+    private String qrAccountNumber;
+
+    @Value("${app.qr.bank-code:${payment.qr.bank-code:MB}}")
+    private String qrBankCode;
+
+    @Value("${app.rio.poll-url:${payment.qr.verify-url:https://thanhdat050625.onrender.com/api/rio/cnpm/sent}}")
+    private String qrVerifyUrl;
+
+    @Value("${app.rio.timeout-ms:8000}")
+    private long qrVerifyTimeoutMs;
 
     @Value("${app.mail.from:${spring.mail.username:}}")
     private String mailFromAddress;
@@ -72,6 +112,7 @@ public class OrderService {
 
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
+        validatePaymentBeforeCreation(request);
         accessControlService.requireCustomerAccess(request.getCustomerId());
 
         Customer customer = customerRepository.findById(request.getCustomerId())
@@ -146,6 +187,95 @@ public class OrderService {
         }
 
         return toOrderResponse(savedOrder);
+    }
+
+    public QrPaymentResponse prepareQrPayment(QrPaymentPrepareRequest request) {
+        accessControlService.requireCustomerAccess(request.getCustomerId());
+
+        customerRepository.findById(request.getCustomerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + request.getCustomerId()));
+
+        OrderRequest orderRequest = buildOrderRequestForQr(request);
+        long totalAmount = calculateTotalAmount(orderRequest);
+
+        String orderId = UUID.randomUUID().toString();
+        pendingQrPaymentSessions.put(
+                orderId,
+                new PendingQrPaymentSession(orderId, request.getCustomerId(), orderRequest, totalAmount)
+        );
+
+        return QrPaymentResponse.builder()
+                .orderId(orderId)
+                .accountNumber(qrAccountNumber)
+                .bankCode(qrBankCode)
+                .amount(totalAmount)
+                .description(orderId)
+                .qrUrl(buildQrUrl(orderId, totalAmount))
+                .build();
+    }
+
+    public QrPaymentStatusResponse verifyQrPayment(String orderId) {
+        PendingQrPaymentSession session = pendingQrPaymentSessions.get(orderId);
+        if (session == null) {
+            return QrPaymentStatusResponse.builder()
+                    .orderId(orderId)
+                    .status(QR_PAYMENT_STATUS_CANCELLED)
+                    .expectedAmount(0L)
+                    .receivedAmount(null)
+                    .message("Phiên thanh toán đã không còn tồn tại. Vui lòng tạo lại mã QR.")
+                    .order(null)
+                    .build();
+        }
+
+        accessControlService.requireCustomerAccess(session.customerId());
+
+        synchronized (session) {
+            if (session.isCancelled()) {
+                return buildQrStatusResponse(session, QR_PAYMENT_STATUS_CANCELLED, session.getLastMessage(), null);
+            }
+
+            if (session.isCompleted()) {
+                OrderResponse order = findOrderResponse(session.getCreatedOrderId());
+                return buildQrStatusResponse(session, QR_PAYMENT_STATUS_SUCCESS, "Thanh toán thành công.", order);
+            }
+
+            RioPaymentResult rioPayment = queryRioPayment(orderId);
+            session.setReceivedAmount(rioPayment.amount());
+
+            if (!rioPayment.paid()) {
+                return buildQrStatusResponse(session, QR_PAYMENT_STATUS_PENDING, "Chưa nhận được thanh toán.", null);
+            }
+
+            if (rioPayment.amount() != session.expectedAmount()) {
+                return buildQrStatusResponse(
+                        session,
+                        QR_PAYMENT_STATUS_WRONG_AMOUNT,
+                        "Đã nhận thanh toán nhưng sai số tiền. Vui lòng chuyển đúng số tiền của đơn hàng.",
+                        null
+                );
+            }
+
+            OrderResponse createdOrder = createOrder(buildPaidOrderRequest(session.orderRequest()));
+            cartService.clearCart(session.customerId(), true);
+            session.complete(createdOrder.getId(), rioPayment.amount());
+            return buildQrStatusResponse(session, QR_PAYMENT_STATUS_SUCCESS, "Thanh toán thành công.", createdOrder);
+        }
+    }
+
+    public void cancelQrPayment(String orderId) {
+        PendingQrPaymentSession session = pendingQrPaymentSessions.get(orderId);
+        if (session == null) {
+            return;
+        }
+
+        accessControlService.requireCustomerAccess(session.customerId());
+
+        synchronized (session) {
+            if (session.isCompleted()) {
+                throw new IllegalStateException("Đơn hàng đã được thanh toán thành công, không thể hủy phiên.");
+            }
+            session.cancel("Bạn đã hủy thanh toán.");
+        }
     }
 
     @Transactional
@@ -486,19 +616,270 @@ public class OrderService {
         return order.getPayment() != null && Boolean.TRUE.equals(order.getPayment().getIsPaid());
     }
 
+    private void validatePaymentBeforeCreation(OrderRequest request) {
+        OrderRequest.PaymentRequest paymentRequest = request.getPayment();
+        if (paymentRequest == null) {
+            throw new IllegalArgumentException("Payment information is required.");
+        }
+        if (paymentRequest.getMethod() != PaymentMethod.BANK_TRANSFER) {
+            throw new IllegalArgumentException("Only BANK_TRANSFER is supported.");
+        }
+        if (!Boolean.TRUE.equals(paymentRequest.getIsPaid())) {
+            throw new IllegalArgumentException("Order can only be created after successful payment.");
+        }
+        if (paymentRequest.getStatus() != PaymentStatus.COMPLETED) {
+            throw new IllegalArgumentException("Payment status must be COMPLETED.");
+        }
+    }
+
+    private OrderRequest buildOrderRequestForQr(QrPaymentPrepareRequest request) {
+        OrderRequest orderRequest = new OrderRequest();
+        orderRequest.setCustomerId(request.getCustomerId());
+        orderRequest.setNote(request.getNote());
+        orderRequest.setShippingAddress(request.getShippingAddress());
+        orderRequest.setVoucherCode(request.getVoucherCode());
+        orderRequest.setItems(copyOrderItems(request.getItems()));
+        orderRequest.setShipping(copyShipping(request.getShipping()));
+        return orderRequest;
+    }
+
+    private OrderRequest buildPaidOrderRequest(OrderRequest source) {
+        OrderRequest copied = deepCopyOrderRequest(source);
+        OrderRequest.PaymentRequest paymentRequest = new OrderRequest.PaymentRequest();
+        paymentRequest.setMethod(PaymentMethod.BANK_TRANSFER);
+        paymentRequest.setStatus(PaymentStatus.COMPLETED);
+        paymentRequest.setIsPaid(true);
+        paymentRequest.setPaymentDate(new Date());
+        copied.setPayment(paymentRequest);
+        return copied;
+    }
+
+    private OrderRequest deepCopyOrderRequest(OrderRequest source) {
+        OrderRequest copied = new OrderRequest();
+        copied.setCustomerId(source.getCustomerId());
+        copied.setNote(source.getNote());
+        copied.setShippingAddress(source.getShippingAddress());
+        copied.setVoucherCode(source.getVoucherCode());
+        copied.setItems(copyOrderItems(source.getItems()));
+        copied.setShipping(copyShipping(source.getShipping()));
+        return copied;
+    }
+
+    private List<OrderRequest.OrderItemRequest> copyOrderItems(List<OrderRequest.OrderItemRequest> items) {
+        if (items == null) {
+            return List.of();
+        }
+        return items.stream().map(item -> {
+            OrderRequest.OrderItemRequest copiedItem = new OrderRequest.OrderItemRequest();
+            copiedItem.setProductId(item.getProductId());
+            copiedItem.setQuantity(item.getQuantity());
+            return copiedItem;
+        }).toList();
+    }
+
+    private OrderRequest.ShippingRequest copyShipping(OrderRequest.ShippingRequest shipping) {
+        if (shipping == null) {
+            return null;
+        }
+        OrderRequest.ShippingRequest copied = new OrderRequest.ShippingRequest();
+        copied.setTrackingNumber(shipping.getTrackingNumber());
+        copied.setCarrierName(shipping.getCarrierName());
+        copied.setCarrierPhone(shipping.getCarrierPhone());
+        copied.setEstimatedDelivery(shipping.getEstimatedDelivery());
+        copied.setFullName(shipping.getFullName());
+        copied.setPhone(shipping.getPhone());
+        copied.setProvince(shipping.getProvince());
+        copied.setDistrict(shipping.getDistrict());
+        copied.setWard(shipping.getWard());
+        copied.setDetailAddress(shipping.getDetailAddress());
+        return copied;
+    }
+
+    private long calculateTotalAmount(OrderRequest request) {
+        long totalAmount = 0L;
+        for (OrderRequest.OrderItemRequest itemReq : request.getItems()) {
+            Product product = productRepository.findById(itemReq.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + itemReq.getProductId()));
+
+            int quantity = itemReq.getQuantity() == null ? 0 : itemReq.getQuantity();
+            int availableStock = product.getStockQuantity() == null ? 0 : product.getStockQuantity();
+            if (quantity <= 0) {
+                throw new IllegalArgumentException("Product quantity must be greater than 0.");
+            }
+            if (quantity > availableStock) {
+                throw new IllegalArgumentException("Product " + product.getName() + " only has " + availableStock + " in stock.");
+            }
+
+            long unitPrice = product.getPrice() == null ? 0L : product.getPrice();
+            totalAmount += unitPrice * quantity;
+        }
+
+        if (StringUtils.hasText(request.getVoucherCode())) {
+            Voucher voucher = voucherService.applyVoucher(request.getVoucherCode());
+            long discount = totalAmount * voucher.getDiscountPercent() / 100;
+            totalAmount -= discount;
+        }
+
+        return Math.max(totalAmount, 0L);
+    }
+
+    private String buildQrUrl(String orderId, long amount) {
+        String description = URLEncoder.encode(orderId, StandardCharsets.UTF_8);
+        return QR_BASE_URL + "?acc=" + qrAccountNumber + "&bank=" + qrBankCode + "&amount=" + amount + "&des=" + description;
+    }
+
+    private QrPaymentStatusResponse buildQrStatusResponse(
+            PendingQrPaymentSession session,
+            String status,
+            String message,
+            OrderResponse order
+    ) {
+        return QrPaymentStatusResponse.builder()
+                .orderId(session.orderId())
+                .status(status)
+                .expectedAmount(session.expectedAmount())
+                .receivedAmount(session.getReceivedAmount())
+                .message(message)
+                .order(order)
+                .build();
+    }
+
+    private OrderResponse findOrderResponse(String orderId) {
+        if (!StringUtils.hasText(orderId)) {
+            return null;
+        }
+        return orderRepository.findById(orderId).map(this::toOrderResponse).orElse(null);
+    }
+
+    private RioPaymentResult queryRioPayment(String orderId) {
+        try {
+            String payload = objectMapper.writeValueAsString(Map.of("order_id", orderId));
+            long timeoutMs = qrVerifyTimeoutMs > 0 ? qrVerifyTimeoutMs : 8000L;
+            HttpRequest request = HttpRequest.newBuilder(URI.create(qrVerifyUrl))
+                    .timeout(Duration.ofMillis(timeoutMs))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(payload))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                log.warn("QR verify gateway responded {} for order {}", response.statusCode(), orderId);
+                return new RioPaymentResult(false, 0L);
+            }
+            JsonNode body = objectMapper.readTree(response.body());
+            boolean paid = body.path("status").asBoolean(false);
+            long amount = body.path("amount").asLong(0L);
+            return new RioPaymentResult(paid, amount);
+        } catch (Exception ex) {
+            log.warn("Failed to verify QR payment for order {}", orderId, ex);
+            return new RioPaymentResult(false, 0L);
+        }
+    }
+
+    private record RioPaymentResult(boolean paid, long amount) {
+    }
+
+    private enum QrSessionState {
+        PENDING,
+        COMPLETED,
+        CANCELLED
+    }
+
+    private static final class PendingQrPaymentSession {
+        private final String orderId;
+        private final String customerId;
+        private final OrderRequest orderRequest;
+        private final long expectedAmount;
+        private QrSessionState state = QrSessionState.PENDING;
+        private String createdOrderId;
+        private Long receivedAmount;
+        private String lastMessage;
+
+        private PendingQrPaymentSession(
+                String orderId,
+                String customerId,
+                OrderRequest orderRequest,
+                long expectedAmount
+        ) {
+            this.orderId = orderId;
+            this.customerId = customerId;
+            this.orderRequest = orderRequest;
+            this.expectedAmount = expectedAmount;
+        }
+
+        private String orderId() {
+            return orderId;
+        }
+
+        private String customerId() {
+            return customerId;
+        }
+
+        private OrderRequest orderRequest() {
+            return orderRequest;
+        }
+
+        private long expectedAmount() {
+            return expectedAmount;
+        }
+
+        private void complete(String orderId, Long amount) {
+            this.state = QrSessionState.COMPLETED;
+            this.createdOrderId = orderId;
+            this.receivedAmount = amount;
+            this.lastMessage = "Payment completed.";
+        }
+
+        private void cancel(String message) {
+            this.state = QrSessionState.CANCELLED;
+            this.lastMessage = message;
+        }
+
+        private boolean isCompleted() {
+            return this.state == QrSessionState.COMPLETED;
+        }
+
+        private boolean isCancelled() {
+            return this.state == QrSessionState.CANCELLED;
+        }
+
+        private void setReceivedAmount(Long receivedAmount) {
+            this.receivedAmount = receivedAmount;
+        }
+
+        private Long getReceivedAmount() {
+            return receivedAmount;
+        }
+
+        private String getCreatedOrderId() {
+            return createdOrderId;
+        }
+
+        private String getLastMessage() {
+            return lastMessage;
+        }
+    }
+
     private Payment buildPayment(OrderRequest request, Order order, long amount) {
         OrderRequest.PaymentRequest paymentRequest = request.getPayment();
         PaymentMethod method = paymentRequest != null && paymentRequest.getMethod() != null
                 ? paymentRequest.getMethod()
-                : PaymentMethod.COD;
+                : PaymentMethod.BANK_TRANSFER;
 
-        boolean isPaid = paymentRequest != null && paymentRequest.getIsPaid() != null
-                ? paymentRequest.getIsPaid()
-                : method != PaymentMethod.COD;
+        if (method != PaymentMethod.BANK_TRANSFER) {
+            throw new IllegalArgumentException("Chỉ hỗ trợ thanh toán chuyển khoản QR.");
+        }
+
+        boolean isPaid = paymentRequest != null && Boolean.TRUE.equals(paymentRequest.getIsPaid());
+        if (!isPaid) {
+            throw new IllegalArgumentException("Đơn hàng chỉ được tạo sau khi thanh toán thành công.");
+        }
 
         PaymentStatus status = paymentRequest != null && paymentRequest.getStatus() != null
                 ? paymentRequest.getStatus()
-                : (isPaid ? PaymentStatus.COMPLETED : PaymentStatus.RECEIVED);
+                : PaymentStatus.COMPLETED;
+        if (status != PaymentStatus.COMPLETED) {
+            throw new IllegalArgumentException("Trạng thái thanh toán phải là COMPLETED.");
+        }
 
         Date paymentDate = paymentRequest != null && paymentRequest.getPaymentDate() != null
                 ? paymentRequest.getPaymentDate()
