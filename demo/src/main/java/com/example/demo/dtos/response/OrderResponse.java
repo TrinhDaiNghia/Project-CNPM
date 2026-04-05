@@ -29,7 +29,6 @@ public class OrderResponse {
     private List<OrderStatusHistoryResponse> timeline;
 
     private PaymentResponse payment;
-    private ShippingResponse shipping;
 
     private boolean canCancel;
     private boolean canRequestCancel;
@@ -48,13 +47,4 @@ public class OrderResponse {
         private Long amount;
     }
 
-    @Data
-    @Builder
-    public static class ShippingResponse {
-        private String trackingNumber;
-        private Date trackingDate;
-        private String carrierName;
-        private String carrierPhone;
-        private Date estimatedDelivery;
-    }
 }

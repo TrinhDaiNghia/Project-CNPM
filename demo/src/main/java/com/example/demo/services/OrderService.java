@@ -14,7 +14,6 @@ import com.example.demo.entities.OrderItem;
 import com.example.demo.entities.OrderStatusHistory;
 import com.example.demo.entities.Payment;
 import com.example.demo.entities.Product;
-import com.example.demo.entities.Shipping;
 import com.example.demo.entities.Voucher;
 import com.example.demo.entities.enums.OrderStatus;
 import com.example.demo.entities.enums.PaymentMethod;
@@ -167,9 +166,7 @@ public class OrderService {
         order.setTotalAmount(totalAmount);
 
         Payment payment = buildPayment(request, order, totalAmount);
-        Shipping shipping = buildShipping(request, order, customer);
         order.setPayment(payment);
-        order.setShipping(shipping);
 
         Order savedOrder = orderRepository.save(order);
         appendHistory(savedOrder, OrderStatus.PENDING, "Đơn hàng được tạo", customer.getUsername());
@@ -291,9 +288,6 @@ public class OrderService {
         validateStatusTransition(order.getStatus(), status);
 
         order.setStatus(status);
-        if (status == OrderStatus.SHIPPING && order.getShipping() != null && order.getShipping().getTrackingDate() == null) {
-            order.getShipping().setTrackingDate(new Date());
-        }
         order = orderRepository.save(order);
 
         appendHistory(order, status, "Cập nhật bởi nhân viên", getCurrentUsername());
@@ -414,17 +408,6 @@ public class OrderService {
                     .build();
         }
 
-        OrderResponse.ShippingResponse shippingResponse = null;
-        if (order.getShipping() != null) {
-            shippingResponse = OrderResponse.ShippingResponse.builder()
-                    .trackingNumber(order.getShipping().getTrackingNumber())
-                    .trackingDate(order.getShipping().getTrackingDate())
-                    .carrierName(order.getShipping().getCarrierName())
-                    .carrierPhone(order.getShipping().getCarrierPhone())
-                    .estimatedDelivery(order.getShipping().getEstimatedDelivery())
-                    .build();
-        }
-
         String latestCancellationNote = historyEntries.stream()
                 .filter(item -> item.getStatus() == OrderStatus.CANCELLED)
                 .reduce((first, second) -> second)
@@ -447,7 +430,6 @@ public class OrderService {
                 .orderItems(itemResponses)
                 .timeline(timeline)
                 .payment(paymentResponse)
-                .shipping(shippingResponse)
                 .canCancel(isSelfCancelable(order))
                 .canRequestCancel(order.getStatus() == OrderStatus.SHIPPING)
                 .refundRequired(isRefundRequired(order))
@@ -892,29 +874,6 @@ public class OrderService {
                 .status(status)
                 .isPaid(isPaid)
                 .paymentDate(paymentDate)
-                .build();
-    }
-
-    private Shipping buildShipping(OrderRequest request, Order order, Customer customer) {
-        OrderRequest.ShippingRequest shippingRequest = request.getShipping();
-
-        String carrierPhone = null;
-        if (shippingRequest != null) {
-            carrierPhone = normalizeText(shippingRequest.getCarrierPhone());
-            if (!StringUtils.hasText(carrierPhone)) {
-                carrierPhone = normalizeText(shippingRequest.getPhone());
-            }
-        }
-        if (!StringUtils.hasText(carrierPhone)) {
-            carrierPhone = normalizeText(customer.getPhone());
-        }
-
-        return Shipping.builder()
-                .order(order)
-                .trackingNumber(shippingRequest != null ? normalizeText(shippingRequest.getTrackingNumber()) : null)
-                .carrierName(shippingRequest != null ? normalizeText(shippingRequest.getCarrierName()) : null)
-                .carrierPhone(carrierPhone)
-                .estimatedDelivery(shippingRequest != null ? shippingRequest.getEstimatedDelivery() : null)
                 .build();
     }
 
