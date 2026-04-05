@@ -2,7 +2,10 @@ package com.example.demo.controllers;
 
 import com.example.demo.dtos.request.CancelOrderRequest;
 import com.example.demo.dtos.request.OrderRequest;
+import com.example.demo.dtos.request.QrPaymentPrepareRequest;
 import com.example.demo.dtos.response.OrderResponse;
+import com.example.demo.dtos.response.QrPaymentResponse;
+import com.example.demo.dtos.response.QrPaymentStatusResponse;
 import com.example.demo.entities.enums.OrderStatus;
 import com.example.demo.services.OrderService;
 import jakarta.validation.Valid;
@@ -44,6 +47,22 @@ public class OrderController {
     @PostMapping
     public ResponseEntity<OrderResponse> create(@Valid @RequestBody OrderRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(orderService.createOrder(request));
+    }
+
+    @PostMapping("/qr/prepare")
+    public ResponseEntity<QrPaymentResponse> prepareQrPayment(@Valid @RequestBody QrPaymentPrepareRequest request) {
+        return ResponseEntity.ok(orderService.prepareQrPayment(request));
+    }
+
+    @PostMapping("/qr/{orderId}/verify")
+    public ResponseEntity<QrPaymentStatusResponse> verifyQrPayment(@PathVariable String orderId) {
+        return ResponseEntity.ok(orderService.verifyQrPayment(orderId));
+    }
+
+    @DeleteMapping("/qr/{orderId}")
+    public ResponseEntity<Void> cancelQrPayment(@PathVariable String orderId) {
+        orderService.cancelQrPayment(orderId);
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/status")
