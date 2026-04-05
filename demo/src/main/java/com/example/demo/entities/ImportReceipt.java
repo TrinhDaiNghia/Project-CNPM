@@ -41,9 +41,24 @@ public class ImportReceipt {
     @NotNull(message = "Owner is required")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false)
-    private Owner owner;
+    private User owner;
 
     @OneToMany(mappedBy = "importReceipt", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @Builder.Default
     private List<ImportDetail> importDetails = new ArrayList<>();
+
+    @Transient
+    public Long getTotalCost() {
+        if (importDetails == null || importDetails.isEmpty()) {
+            return 0L;
+        }
+
+        long total = 0L;
+        for (ImportDetail detail : importDetails) {
+            if (detail.getImportPrice() != null && detail.getQuantity() != null) {
+                total += detail.getImportPrice() * detail.getQuantity();
+            }
+        }
+        return total;
+    }
 }

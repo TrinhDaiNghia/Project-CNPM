@@ -3,6 +3,8 @@ package com.example.demo.dtos.request;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class ProductRequest {
 
@@ -24,18 +26,31 @@ public class ProductRequest {
     @Min(value = 0)
     private Integer stockQuantity;
 
-    @NotBlank(message = "Category ID is required")
     private String categoryId;
 
+    private List<@NotBlank(message = "Category ID is required") String> categoryIds;
+
+    @Size(max = 100)
+    private String movementType;
+
+    @Size(max = 100)
+    private String glassMaterial;
+
+    @Size(max = 100)
+    private String waterResistance;
+
     @Size(max = 50)
-    private String partNumber;
+    private String faceSize;
 
     @Size(max = 100)
-    private String powerSource;
+    private String wireMaterial;
 
     @Size(max = 100)
-    private String license;
+    private String wireColor;
 
-    @Size(max = 200)
-    private String warranty;
+    @Size(max = 100)
+    private String caseColor;
+
+    @Size(max = 100)
+    private String faceColor;
 }

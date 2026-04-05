@@ -1,10 +1,12 @@
 package com.example.demo.services;
 
+import com.example.demo.dtos.request.ChangePasswordRequest;
 import com.example.demo.entities.User;
 import com.example.demo.entities.enums.UserRole;
 import com.example.demo.exceptions.ResourceNotFoundException;
 import com.example.demo.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AccessControlService accessControlService;
+    private final UserProfileService userProfileService;
 
     public User createUser(User user) {
         accessControlService.requireOwnerRole();
@@ -39,7 +42,9 @@ public class UserService {
             throw new IllegalStateException("Email already exists");
         }
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+        userProfileService.syncProfileForRole(savedUser);
+        return savedUser;
     }
 
     public User updateUser(String id, User user) {
@@ -62,6 +67,7 @@ public class UserService {
 
         // Password updates are intentionally handled by auth flow (OTP/reset-password).
         existing.setUsername(user.getUsername());
+        existing.setFullName(user.getFullName());
         existing.setEmail(user.getEmail());
         existing.setPhone(user.getPhone());
         existing.setAddress(user.getAddress());
@@ -74,7 +80,34 @@ public class UserService {
             throw new org.springframework.security.access.AccessDeniedException("Only OWNER can change user role");
         }
 
-        return userRepository.save(existing);
+        User updatedUser = userRepository.save(existing);
+        userProfileService.syncProfileForRole(updatedUser);
+        return updatedUser;
+    }
+
+    public void changePassword(String id, ChangePasswordRequest request) {
+        User existing = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+        User currentUser = accessControlService.getCurrentUserOrThrow();
+
+        if (!currentUser.getId().equals(existing.getId())) {
+            throw new AccessDeniedException("You are not allowed to change this password");
+        }
+
+        if (!passwordEncoder.matches(request.getOldPassword(), existing.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
+
+        existing.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(existing);
+    }
+
+    public User lockStaff(String id) {
+        return updateStaffActiveStatus(id, false);
+    }
+
+    public User unlockStaff(String id) {
+        return updateStaffActiveStatus(id, true);
     }
 
     public void deleteUser(String id) {
@@ -102,7 +135,7 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public List<User> findAllByRole(UserRole role) {
-        accessControlService.requirePrivilegedRole();
+        accessControlService.requireOwnerRole();
         return userRepository.findByRole(role);
     }
 
@@ -122,6 +155,20 @@ public class UserService {
     public boolean existsByEmail(String email) {
         accessControlService.requirePrivilegedRole();
         return userRepository.existsByEmail(email);
+    }
+
+    private User updateStaffActiveStatus(String userId, boolean isActive) {
+        accessControlService.requireOwnerRole();
+
+        User existing = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+
+        if (existing.getRole() != UserRole.STAFF) {
+            throw new IllegalStateException("Only STAFF accounts can be locked/unlocked from staff management");
+        }
+
+        existing.setIsActive(isActive);
+        return userRepository.save(existing);
     }
 }
 

@@ -7,12 +7,13 @@ import com.example.demo.dtos.request.ResetPasswordRequest;
 import com.example.demo.dtos.request.VerifyEmailOtpRequest;
 import com.example.demo.dtos.response.AuthResponse;
 import com.example.demo.dtos.response.OtpResponse;
-import com.example.demo.entities.Customer;
 import com.example.demo.entities.User;
+import com.example.demo.entities.Customer;
 import com.example.demo.entities.enums.UserRole;
-import com.example.demo.repositories.CustomerRepository;
 import com.example.demo.repositories.UserRepository;
+import com.example.demo.repositories.CustomerRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,25 +25,25 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailOtpService emailOtpService;
     private final JwtService jwtService;
+    private final UserProfileService userProfileService;
+    private final NotificationService notificationService;
+    private final CustomerRepository customerRepository;
     private final Map<String, PendingRegistration> pendingRegistrations = new ConcurrentHashMap<>();
 
     public OtpResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalStateException("Email already exists");
         }
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new IllegalStateException("Username already exists");
-        }
-
+         
         RegisterRequest pendingRequest = copyRegisterRequest(request);
         pendingRequest.setPassword(passwordEncoder.encode(request.getPassword()));
 
@@ -85,34 +86,39 @@ public class AuthService {
             throw new IllegalStateException("Username already exists");
         }
 
-        User user = User.builder()
-                .username(registerRequest.getUsername())
-            .password(registerRequest.getPassword())
-                .email(registerRequest.getEmail())
-                .phone(registerRequest.getPhone())
-                .address(registerRequest.getAddress())
-                .gender(registerRequest.getGender())
-                .role(UserRole.CUSTOMER)
-                .build();
+        Customer customer = new Customer();
+        customer.setUsername(registerRequest.getUsername());
+        customer.setPassword(registerRequest.getPassword());
+        customer.setFullName(registerRequest.getFullName());
+        customer.setEmail(registerRequest.getEmail());
+        customer.setPhone(registerRequest.getPhone());
+        customer.setAddress(registerRequest.getAddress());
+        customer.setGender(registerRequest.getGender());
+        customer.setRole(UserRole.CUSTOMER);
 
-        User savedUser = userRepository.save(Objects.requireNonNull(user));
-        Customer customer = Customer.builder()
-                .user(savedUser)
-                .build();
-        customerRepository.save(Objects.requireNonNull(customer));
+        User savedUser = userRepository.save(Objects.requireNonNull(customer));
         pendingRegistrations.remove(emailKey);
+        notificationService.sendRegistrationSuccessNotification(savedUser);
 
         return Optional.of(buildAuthResponse(savedUser, "Register successful"));
     }
 
     @Transactional(readOnly = true)
     public Optional<AuthResponse> login(LoginRequest request) {
-        Optional<User> optionalUser = findByUsernameOrEmail(request.getUsernameOrEmail());
+        String identifier = normalizeLoginIdentifier(request.getUsernameOrEmail());
+        Optional<User> optionalUser = userRepository.findByUsername(identifier);
+        if (optionalUser.isEmpty()) {
+            optionalUser = userRepository.findByEmail(normalizeEmail(identifier));
+        }
         if (optionalUser.isEmpty()) {
             return Optional.empty();
         }
 
         User user = optionalUser.get();
+        if (Boolean.FALSE.equals(user.getIsActive())) {
+            return Optional.empty();
+        }
+
         boolean validPassword = passwordEncoder.matches(request.getPassword(), user.getPassword());
         if (!validPassword) {
             return Optional.empty();
@@ -147,12 +153,12 @@ public class AuthService {
         User user = optionalUser.get();
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+        try {
+            notificationService.sendPasswordResetSuccessNotification(user);
+        } catch (Exception ex) {
+            log.warn("Password reset notification failed for user {}", user.getId(), ex);
+        }
         return true;
-    }
-
-    private Optional<User> findByUsernameOrEmail(String value) {
-        Optional<User> byEmail = userRepository.findByEmail(value);
-        return byEmail.isPresent() ? byEmail : userRepository.findByUsername(value);
     }
 
     private AuthResponse buildAuthResponse(User user, String message) {
@@ -173,10 +179,15 @@ public class AuthService {
         return email == null ? "" : email.trim().toLowerCase();
     }
 
+    private String normalizeLoginIdentifier(String identifier) {
+        return identifier == null ? "" : identifier.trim();
+    }
+
     private RegisterRequest copyRegisterRequest(RegisterRequest request) {
         RegisterRequest copy = new RegisterRequest();
         copy.setUsername(request.getUsername());
         copy.setPassword(request.getPassword());
+        copy.setFullName(request.getFullName());
         copy.setEmail(request.getEmail());
         copy.setPhone(request.getPhone());
         copy.setAddress(request.getAddress());

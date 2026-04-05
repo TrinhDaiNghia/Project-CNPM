@@ -29,8 +29,28 @@
 	</scm>
 	<properties>
 		<java.version>17</java.version>
+		<spring-ai.version>1.1.4</spring-ai.version>
 	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.ai</groupId>
+				<artifactId>spring-ai-bom</artifactId>
+				<version>${spring-ai.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<dependencies>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -44,6 +64,7 @@
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-devtools</artifactId>
@@ -55,6 +76,7 @@
 			<artifactId>mysql-connector-j</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+	
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
@@ -93,6 +115,26 @@
 			<artifactId>jjwt-jackson</artifactId>
 			<version>0.12.6</version>
 			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.cloudinary</groupId>
+			<artifactId>cloudinary-http44</artifactId>
+			<version>1.39.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-model-google-genai</artifactId>
+			<version>${spring-ai.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-google-genai-embedding</artifactId>
+			<version>${spring-ai.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-vector-store-qdrant</artifactId>
+			<version>${spring-ai.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

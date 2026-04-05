@@ -17,11 +17,24 @@ public class ProductResponse {
     private String description;
     private Long price;
     private Integer stockQuantity;
-    private String partNumber;
-    private String warranty;
+    private String movementType;
+    private String glassMaterial;
+    private String waterResistance;
+    private String faceSize;
+    private String wireMaterial;
+    private String wireColor;
+    private String caseColor;
+    private String faceColor;
+    private String color;
+    private String size;
+    private String specs;
     private ProductStatus status;
+    // Legacy fields retained for backward compatibility.
     private String categoryId;
     private String categoryName;
+    private List<String> categoryIds;
+    private List<String> categoryNames;
+    private List<ProductCategoryResponse> categories;
     private List<String> imageUrls;
     private Double averageRating;
     private Date updatedAt;

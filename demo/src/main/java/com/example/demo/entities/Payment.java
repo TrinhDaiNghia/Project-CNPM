@@ -2,6 +2,7 @@ package com.example.demo.entities;
 
 import com.example.demo.entities.enums.PaymentMethod;
 import com.example.demo.entities.enums.PaymentStatus;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -50,5 +51,6 @@ public class Payment {
     @NotNull(message = "Order is required")
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false, unique = true)
+    @JsonIgnore
     private Order order;
 }

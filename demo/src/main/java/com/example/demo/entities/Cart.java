@@ -1,5 +1,6 @@
 package com.example.demo.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -30,6 +31,7 @@ public class Cart {
     @NotNull(message = "Customer is required")
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_id", nullable = false, unique = true)
+    @JsonIgnore
     private Customer customer;
 
     @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)

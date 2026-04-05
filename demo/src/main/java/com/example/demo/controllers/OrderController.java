@@ -1,6 +1,11 @@
 package com.example.demo.controllers;
 
-import com.example.demo.entities.Order;
+import com.example.demo.dtos.request.CancelOrderRequest;
+import com.example.demo.dtos.request.OrderRequest;
+import com.example.demo.dtos.request.QrPaymentPrepareRequest;
+import com.example.demo.dtos.response.OrderResponse;
+import com.example.demo.dtos.response.QrPaymentResponse;
+import com.example.demo.dtos.response.QrPaymentStatusResponse;
 import com.example.demo.entities.enums.OrderStatus;
 import com.example.demo.services.OrderService;
 import jakarta.validation.Valid;
@@ -19,35 +24,65 @@ public class OrderController {
 
     private final OrderService orderService;
 
+    @GetMapping
+    public ResponseEntity<Page<OrderResponse>> getAllOrders(
+            @PageableDefault(size = 100, sort = "orderDate,desc") Pageable pageable) {
+        return ResponseEntity.ok(orderService.findAllOrders(pageable));
+    }
+
     @GetMapping("/{id}")
-    public ResponseEntity<Order> getById(@PathVariable String id) {
+    public ResponseEntity<OrderResponse> getById(@PathVariable String id) {
         return orderService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/customer/{customerId}")
-    public ResponseEntity<Page<Order>> getByCustomer(
+    public ResponseEntity<Page<OrderResponse>> getByCustomer(
             @PathVariable String customerId,
             @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(orderService.findByCustomerId(customerId, pageable));
     }
 
     @PostMapping
-    public ResponseEntity<Order> create(@Valid @RequestBody Order order) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.createOrder(order));
+    public ResponseEntity<OrderResponse> create(@Valid @RequestBody OrderRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.createOrder(request));
+    }
+
+    @PostMapping("/qr/prepare")
+    public ResponseEntity<QrPaymentResponse> prepareQrPayment(@Valid @RequestBody QrPaymentPrepareRequest request) {
+        return ResponseEntity.ok(orderService.prepareQrPayment(request));
+    }
+
+    @PostMapping("/qr/{orderId}/verify")
+    public ResponseEntity<QrPaymentStatusResponse> verifyQrPayment(@PathVariable String orderId) {
+        return ResponseEntity.ok(orderService.verifyQrPayment(orderId));
+    }
+
+    @DeleteMapping("/qr/{orderId}")
+    public ResponseEntity<Void> cancelQrPayment(@PathVariable String orderId) {
+        orderService.cancelQrPayment(orderId);
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/status")
-    public ResponseEntity<Order> updateStatus(
+    public ResponseEntity<OrderResponse> updateStatus(
             @PathVariable String id,
             @RequestParam OrderStatus status) {
         return ResponseEntity.ok(orderService.updateOrderStatus(id, status));
     }
 
     @PatchMapping("/{id}/cancel")
-    public ResponseEntity<Void> cancel(@PathVariable String id) {
-        orderService.cancelOrder(id);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<OrderResponse> cancel(
+            @PathVariable String id,
+            @RequestBody(required = false) CancelOrderRequest request) {
+        return ResponseEntity.ok(orderService.cancelOrder(id, request));
+    }
+
+    @PatchMapping("/{id}/cancel-request")
+    public ResponseEntity<OrderResponse> requestCancel(
+            @PathVariable String id,
+            @RequestBody(required = false) CancelOrderRequest request) {
+        return ResponseEntity.ok(orderService.requestCancelForShippingOrder(id, request));
     }
 }

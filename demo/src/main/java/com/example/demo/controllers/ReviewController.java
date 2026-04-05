@@ -1,7 +1,7 @@
 package com.example.demo.controllers;
 
 import com.example.demo.dtos.request.ReviewRequest;
-import com.example.demo.entities.Review;
+import com.example.demo.dtos.response.ReviewResponse;
 import com.example.demo.services.ReviewService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +19,7 @@ public class ReviewController {
     private final ReviewService reviewService;
 
     @GetMapping("/product/{productId}")
-    public ResponseEntity<List<Review>> getByProduct(@PathVariable String productId) {
+    public ResponseEntity<List<ReviewResponse>> getByProduct(@PathVariable String productId) {
         return ResponseEntity.ok(reviewService.findByProductId(productId));
     }
 
@@ -29,17 +29,17 @@ public class ReviewController {
     }
 
     @GetMapping("/customer/{customerId}")
-    public ResponseEntity<List<Review>> getByCustomer(@PathVariable String customerId) {
+    public ResponseEntity<List<ReviewResponse>> getByCustomer(@PathVariable String customerId) {
         return ResponseEntity.ok(reviewService.findByCustomerId(customerId));
     }
 
-    @PostMapping
-    public ResponseEntity<Review> create(@Valid @RequestBody ReviewRequest request) {
+    @PostMapping("/create")
+    public ResponseEntity<ReviewResponse> create(@Valid @RequestBody ReviewRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(reviewService.createReview(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Review> update(@PathVariable String id, @Valid @RequestBody ReviewRequest request) {
+    public ResponseEntity<ReviewResponse> update(@PathVariable String id, @Valid @RequestBody ReviewRequest request) {
         return ResponseEntity.ok(reviewService.updateReview(id, request));
     }
 

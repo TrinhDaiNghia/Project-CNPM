@@ -1,5 +1,6 @@
 package com.example.demo.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -37,6 +38,7 @@ public class CartItem {
     @NotNull(message = "Cart is required")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cart_id", nullable = false)
+    @JsonIgnore
     private Cart cart;
 
     @NotNull(message = "Product is required")

@@ -38,10 +38,31 @@ public class SecurityConfig {
                     .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/reports/**").hasRole("OWNER")
+
+                        .requestMatchers("/api/staff/**").hasRole("OWNER")
+
+                        .requestMatchers(HttpMethod.GET, "/api/customers/**").hasAnyRole("STAFF", "OWNER")
+                        .requestMatchers(HttpMethod.POST, "/api/customers/**").hasAnyRole("STAFF", "OWNER")
+                        .requestMatchers(HttpMethod.PATCH, "/api/customers/**").hasAnyRole("STAFF", "OWNER")
+                        .requestMatchers(HttpMethod.PUT, "/api/customers/**").hasAnyRole("STAFF", "OWNER", "CUSTOMER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/customers/**").hasAnyRole("STAFF", "OWNER")
+
+                        .requestMatchers(HttpMethod.GET, "/api/warranties/customer").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.POST, "/api/warranties/customer/**").hasRole("CUSTOMER")
+
+                        .requestMatchers("/api/suppliers/**").hasRole("OWNER")
+                        .requestMatchers("/api/import-receipts/**").hasRole("OWNER")
+                        .requestMatchers("/api/warranties/**").hasAnyRole("STAFF", "OWNER")
+
+                        .requestMatchers(HttpMethod.GET, "/api/vouchers", "/api/vouchers/search").hasRole("OWNER")
+                        .requestMatchers(HttpMethod.POST, "/api/vouchers").hasRole("OWNER")
+                        .requestMatchers(HttpMethod.PUT, "/api/vouchers/**").hasRole("OWNER")
+                        .requestMatchers(HttpMethod.PATCH, "/api/vouchers/**").hasRole("OWNER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/vouchers/**").hasRole("OWNER")
+
                         .requestMatchers(HttpMethod.PATCH, "/api/orders/*/status").hasAnyRole("STAFF", "OWNER")
-                        .requestMatchers(HttpMethod.POST, "/api/vouchers").hasAnyRole("STAFF", "OWNER")
-                        .requestMatchers(HttpMethod.PUT, "/api/vouchers/**").hasAnyRole("STAFF", "OWNER")
-                        .requestMatchers(HttpMethod.DELETE, "/api/vouchers/**").hasAnyRole("STAFF", "OWNER")
+                        .requestMatchers(HttpMethod.POST, "/api/products/*/discussions").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.POST, "/api/products/**", "/api/categories/**").hasAnyRole("STAFF", "OWNER")
                         .requestMatchers(HttpMethod.PUT, "/api/products/**", "/api/categories/**").hasAnyRole("STAFF", "OWNER")
                         .requestMatchers(HttpMethod.DELETE, "/api/products/**", "/api/categories/**").hasAnyRole("STAFF", "OWNER")
@@ -63,6 +84,7 @@ public class SecurityConfig {
             return org.springframework.security.core.userdetails.User
                     .withUsername(foundUser.getUsername())
                     .password(foundUser.getPassword())
+                    .disabled(Boolean.FALSE.equals(foundUser.getIsActive()))
                     .roles(foundUser.getRole().name())
                     .build();
         };
