@@ -104,9 +104,6 @@ public class OrderService {
     @Value("${app.rio.timeout-ms:8000}")
     private long qrVerifyTimeoutMs;
 
-    @Value("${payment.qr.session-ttl-minutes:30}")
-    private long qrSessionTtlMinutes;
-
     @Value("${app.mail.from:${spring.mail.username:}}")
     private String mailFromAddress;
 
@@ -193,7 +190,6 @@ public class OrderService {
     }
 
     public QrPaymentResponse prepareQrPayment(QrPaymentPrepareRequest request) {
-        cleanupExpiredQrSessions();
         accessControlService.requireCustomerAccess(request.getCustomerId());
 
         customerRepository.findById(request.getCustomerId())
@@ -205,7 +201,7 @@ public class OrderService {
         String orderId = UUID.randomUUID().toString();
         pendingQrPaymentSessions.put(
                 orderId,
-                new PendingQrPaymentSession(orderId, request.getCustomerId(), orderRequest, totalAmount, Instant.now())
+                new PendingQrPaymentSession(orderId, request.getCustomerId(), orderRequest, totalAmount)
         );
 
         return QrPaymentResponse.builder()
@@ -219,19 +215,21 @@ public class OrderService {
     }
 
     public QrPaymentStatusResponse verifyQrPayment(String orderId) {
-        cleanupExpiredQrSessions();
         PendingQrPaymentSession session = pendingQrPaymentSessions.get(orderId);
         if (session == null) {
-            throw new ResourceNotFoundException("QR payment session not found: " + orderId);
+            return QrPaymentStatusResponse.builder()
+                    .orderId(orderId)
+                    .status(QR_PAYMENT_STATUS_CANCELLED)
+                    .expectedAmount(0L)
+                    .receivedAmount(null)
+                    .message("Phiên thanh toán đã không còn tồn tại. Vui lòng tạo lại mã QR.")
+                    .order(null)
+                    .build();
         }
 
         accessControlService.requireCustomerAccess(session.customerId());
 
         synchronized (session) {
-            if (session.isExpired(resolveQrSessionTtlMinutes())) {
-                session.cancel("Phiên thanh toán đã hết hạn.");
-            }
-
             if (session.isCancelled()) {
                 return buildQrStatusResponse(session, QR_PAYMENT_STATUS_CANCELLED, session.getLastMessage(), null);
             }
@@ -265,10 +263,9 @@ public class OrderService {
     }
 
     public void cancelQrPayment(String orderId) {
-        cleanupExpiredQrSessions();
         PendingQrPaymentSession session = pendingQrPaymentSessions.get(orderId);
         if (session == null) {
-            throw new ResourceNotFoundException("QR payment session not found: " + orderId);
+            return;
         }
 
         accessControlService.requireCustomerAccess(session.customerId());
@@ -731,15 +728,6 @@ public class OrderService {
         return QR_BASE_URL + "?acc=" + qrAccountNumber + "&bank=" + qrBankCode + "&amount=" + amount + "&des=" + description;
     }
 
-    private long resolveQrSessionTtlMinutes() {
-        return qrSessionTtlMinutes > 0 ? qrSessionTtlMinutes : 30L;
-    }
-
-    private void cleanupExpiredQrSessions() {
-        long ttlMinutes = resolveQrSessionTtlMinutes();
-        pendingQrPaymentSessions.entrySet().removeIf(entry -> entry.getValue().isExpired(ttlMinutes));
-    }
-
     private QrPaymentStatusResponse buildQrStatusResponse(
             PendingQrPaymentSession session,
             String status,
@@ -801,7 +789,6 @@ public class OrderService {
         private final String customerId;
         private final OrderRequest orderRequest;
         private final long expectedAmount;
-        private final Instant createdAt;
         private QrSessionState state = QrSessionState.PENDING;
         private String createdOrderId;
         private Long receivedAmount;
@@ -811,14 +798,12 @@ public class OrderService {
                 String orderId,
                 String customerId,
                 OrderRequest orderRequest,
-                long expectedAmount,
-                Instant createdAt
+                long expectedAmount
         ) {
             this.orderId = orderId;
             this.customerId = customerId;
             this.orderRequest = orderRequest;
             this.expectedAmount = expectedAmount;
-            this.createdAt = createdAt;
         }
 
         private String orderId() {
@@ -835,10 +820,6 @@ public class OrderService {
 
         private long expectedAmount() {
             return expectedAmount;
-        }
-
-        private boolean isExpired(long ttlMinutes) {
-            return createdAt.plus(ttlMinutes, ChronoUnit.MINUTES).isBefore(Instant.now());
         }
 
         private void complete(String orderId, Long amount) {
